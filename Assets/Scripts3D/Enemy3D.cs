@@ -158,7 +158,8 @@ public class Enemy3D : Hittable3D
             _shieldBubble.transform.localScale = Vector3.one * (5.5f + Mathf.Sin(Time.time * 4f) * 0.2f);
         }
 
-        if (Mathf.Abs(transform.position.z - 120f) > 650f || new Vector2(transform.position.x, transform.position.y).magnitude > 450f)
+        float relZ = transform.position.z - PlayerPos().z;
+        if (relZ > 900f || relZ < -500f || new Vector2(transform.position.x, transform.position.y).magnitude > 500f)
         {
             Destroy(gameObject);
         }

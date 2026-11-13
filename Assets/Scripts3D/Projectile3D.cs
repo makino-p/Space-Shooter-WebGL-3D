@@ -39,6 +39,46 @@ public class Projectile3D : MonoBehaviour
         return p;
     }
 
+    // ---------- Аим-ассист ----------
+    // Если в момент выстрела враг близко и почти по прицелу — пуля сама доворачивает к нему.
+    private Hittable3D _assistTarget;
+    private const float AssistTurnRate = 540f;
+
+    public Projectile3D EnableAimAssist(float range, float coneDegrees)
+    {
+        Vector3 dir = Velocity.normalized;
+        float best = float.MaxValue;
+        foreach (Hittable3D h in Hittable3D.All)
+        {
+            if (h == null || !h.IsAlive || h.Faction != Faction3D.Enemy) continue;
+            Vector3 d = h.transform.position - transform.position;
+            float dist = d.magnitude;
+            if (dist > range + h.Radius || dist < 0.01f) continue;
+            // для близких целей конус шире (учитываем размер цели)
+            float angle = Vector3.Angle(dir, d);
+            float allowed = coneDegrees + Mathf.Atan2(h.Radius, dist) * Mathf.Rad2Deg;
+            if (angle > allowed) continue;
+            float score = angle * 2f + dist * 0.1f;
+            if (score < best)
+            {
+                best = score;
+                _assistTarget = h;
+            }
+        }
+        return this;
+    }
+
+    void UpdateAimAssist(float dt)
+    {
+        if (_assistTarget == null || !_assistTarget.IsAlive)
+        {
+            _assistTarget = null;
+            return;
+        }
+        Vector3 desired = (_assistTarget.transform.position - transform.position).normalized * _speed;
+        Velocity = Vector3.RotateTowards(Velocity, desired, AssistTurnRate * Mathf.Deg2Rad * dt, 0f);
+    }
+
     void OnEnable() { Active.Add(this); }
     void OnDisable() { Active.Remove(this); }
 
@@ -55,6 +95,10 @@ public class Projectile3D : MonoBehaviour
         if (Homing)
         {
             UpdateHoming(dt);
+        }
+        else if (_assistTarget != null)
+        {
+            UpdateAimAssist(dt);
         }
 
         Vector3 from = transform.position;

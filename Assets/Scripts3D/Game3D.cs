@@ -78,16 +78,17 @@ public class Game3D : MonoBehaviour
 
         UI = gameObject.AddComponent<UI3D>();
 
-        // игрок стоит у входа в туннель, носом к вратам врагов
+        // игрок стоит на оси пути, носом туда, откуда прилетают враги
         GameObject playerGo = new GameObject("Player");
-        playerGo.transform.position = new Vector3(0f, 0f, tunnel.StartZ + 30f);
+        playerGo.transform.position = Vector3.zero;
         playerGo.transform.rotation = Quaternion.identity;
         _player = playerGo.AddComponent<Player3D>();
+        Factory3D.SpaceDust(playerGo.transform);
 
         CameraRig.SetTarget(playerGo.transform);
 
         // стартовый астероид прямо по курсу — уничтожь его, чтобы начать
-        Asteroid3D.Spawn(new Vector3(0f, 0f, tunnel.StartZ + 75f), 6f, true);
+        Asteroid3D.Spawn(new Vector3(0f, 0f, 45f), 6f, true);
         SpawnAsteroidField(45);
     }
 
@@ -150,17 +151,19 @@ public class Game3D : MonoBehaviour
         }
 
         // далёкая планета и туманности для ориентации в пространстве
+        // фон следует за камерой, поэтому на бесконечном пути он всегда "на горизонте"
         GameObject planetRoot = new GameObject("Planet");
-        planetRoot.transform.position = new Vector3(-380f, -120f, 520f);
-        Factory3D.Part(PrimitiveType.Sphere, planetRoot.transform, Vector3.zero, Vector3.one * 260f,
+        planetRoot.transform.position = new Vector3(-700f, -220f, 950f);
+        Factory3D.Part(PrimitiveType.Sphere, planetRoot.transform, Vector3.zero, Vector3.one * 480f,
                        Factory3D.Lit(new Color(0.25f, 0.4f, 0.75f), 0.05f, 0f, 0.2f));
-        Factory3D.GlowBall(planetRoot.transform, Vector3.zero, 420f, new Color(0.2f, 0.4f, 1f, 0.35f));
+        Factory3D.GlowBall(planetRoot.transform, Vector3.zero, 780f, new Color(0.2f, 0.4f, 1f, 0.35f));
+        planetRoot.AddComponent<FollowCamera3D>();
 
         if (SkyboxMaterial == null)
         {
-            Factory3D.GlowBall(null, new Vector3(500f, 200f, -300f), 700f, new Color(0.6f, 0.15f, 0.5f, 0.25f));
-            Factory3D.GlowBall(null, new Vector3(-200f, 400f, -500f), 600f, new Color(0.15f, 0.35f, 0.6f, 0.2f));
-            Factory3D.GlowBall(null, new Vector3(300f, -350f, 400f), 500f, new Color(0.7f, 0.35f, 0.1f, 0.18f));
+            Factory3D.GlowBall(null, new Vector3(500f, 200f, -300f), 700f, new Color(0.6f, 0.15f, 0.5f, 0.25f)).AddComponent<FollowCamera3D>();
+            Factory3D.GlowBall(null, new Vector3(-200f, 400f, -500f), 600f, new Color(0.15f, 0.35f, 0.6f, 0.2f)).AddComponent<FollowCamera3D>();
+            Factory3D.GlowBall(null, new Vector3(300f, -350f, 400f), 500f, new Color(0.7f, 0.35f, 0.1f, 0.18f)).AddComponent<FollowCamera3D>();
         }
     }
 
@@ -176,9 +179,9 @@ public class Game3D : MonoBehaviour
                 if (tunnel != null)
                 {
                     // пояс астероидов вокруг туннеля, внутри туннеля чисто
-                    float z = Random.Range(tunnel.StartZ, tunnel.EndZ);
+                    float z = Random.Range(-150f, 750f);
                     Vector2 dir = Random.insideUnitCircle.normalized;
-                    float r = Random.Range(tunnel.Radius + 12f, tunnel.Radius + 140f);
+                    float r = Random.Range(tunnel.Radius + 15f, tunnel.Radius + 170f);
                     pos = new Vector3(dir.x * r, dir.y * r, z);
                 }
                 else
@@ -250,6 +253,30 @@ public class Game3D : MonoBehaviour
             if (Input.GetKeyDown(KeyCode.R))
             {
                 SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+            }
+        }
+        RecycleAsteroids();
+    }
+
+    // Бесконечный путь: астероиды, оставшиеся далеко позади, переносятся далеко вперёд.
+    float _nextRecycle;
+    void RecycleAsteroids()
+    {
+        if (Time.time < _nextRecycle || _player == null || Tunnel3D.Instance == null) return;
+        _nextRecycle = Time.time + 0.5f;
+
+        float pz = _player.transform.position.z;
+        Tunnel3D tunnel = Tunnel3D.Instance;
+        foreach (Hittable3D h in Hittable3D.All)
+        {
+            Asteroid3D a = h as Asteroid3D;
+            if (a == null || a.IsStarter || !a.IsAlive) continue;
+            float rel = a.transform.position.z - pz;
+            if (rel < -220f || rel > 900f)
+            {
+                Vector2 dir = Random.insideUnitCircle.normalized;
+                float r = Random.Range(tunnel.Radius + 15f, tunnel.Radius + 170f);
+                a.transform.position = new Vector3(dir.x * r, dir.y * r, pz + Random.Range(450f, 750f));
             }
         }
     }

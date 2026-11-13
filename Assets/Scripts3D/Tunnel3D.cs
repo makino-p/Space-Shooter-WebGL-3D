@@ -1,34 +1,45 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// Неоновый туннель из спиральных линий вдоль оси Z.
-// Начало — у игрока, в дальнем конце — красные "врата", откуда прилетают враги.
-// Бегущие по кольцам огни показывают, куда лететь. Стены не твёрдые — из туннеля можно вылетать.
+// Бесконечный неоновый путь из спиральных линий вдоль оси Z.
+// Геометрия строится на отрезок вокруг игрока и "перескакивает" вперёд ровно на период узора,
+// поэтому шов не виден, а концы плавно растворяются в темноте — кажется, что путь уходит в бесконечность.
+// Стены не твёрдые: можно вылетать наружу. Враги прилетают издалека по этому пути.
 public class Tunnel3D : MonoBehaviour
 {
     public static Tunnel3D Instance;
 
-    public float StartZ = -140f;
-    public float EndZ = 380f;
-    public float Radius = 28f;
-    public int HelixCount = 3;          // спирали в каждую сторону
-    public float TurnsPerUnit = 1f / 140f;
-    public float RingSpacing = 40f;
-    public float ArenaRadius = 210f;    // как далеко от оси туннеля можно улететь
+    public float Radius = 55f;               // радиус спирали (диаметр 110)
+    public int HelixCount = 3;               // спиралей в каждую сторону
+    public float HelixPeriod = 280f;         // длина одного витка
+    public float RingSpacing = 70f;          // кольца через каждые 70 (период узора кратен 280)
+    public float BehindLength = 300f;        // сколько пути видно позади
+    public float AheadLength = 1100f;        // сколько пути видно впереди
+    public float ArenaRadius = 260f;         // как далеко от оси можно улететь
+    public float EnemySpawnDistance = 420f;  // на каком расстоянии впереди появляются враги
 
-    public Vector3 GatePosition { get { return new Vector3(0f, 0f, EndZ + 25f); } }
-    public Vector3 Axis { get { return Vector3.forward; } }
+    // Для совместимости с остальным кодом: "старт" и середина пути относительно игрока.
+    public float StartZ { get { return CurrentPlayerZ - 30f; } }
+    public float EndZ { get { return CurrentPlayerZ + EnemySpawnDistance; } }
+
+    // точка далеко впереди на пути — оттуда прилетают враги
+    public Vector3 GatePosition { get { return new Vector3(0f, 0f, CurrentPlayerZ + EnemySpawnDistance); } }
 
     private readonly List<LineRenderer> _rings = new List<LineRenderer>();
-    private readonly List<LineRenderer> _helices = new List<LineRenderer>();
-    private Transform _gate;
-    private static readonly Color Cyan = new Color(0.1f, 0.9f, 1f);
-    private static readonly Color Magenta = new Color(1f, 0.15f, 0.85f);
-    private static readonly Color GateRed = new Color(1f, 0.15f, 0.1f);
+    private readonly List<float> _ringZ = new List<float>();
+
+    private static readonly Color Violet = new Color(0.65f, 0.25f, 1f);
+    private static readonly Color Amber = new Color(1f, 0.55f, 0.08f);
+    private static readonly Color Ice = new Color(0.45f, 0.9f, 1f);
+
+    float CurrentPlayerZ
+    {
+        get { return Player3D.Instance != null ? Player3D.Instance.transform.position.z : 0f; }
+    }
 
     public static Tunnel3D Create()
     {
-        GameObject go = new GameObject("Neon_Tunnel");
+        GameObject go = new GameObject("Neon_Path");
         Tunnel3D t = go.AddComponent<Tunnel3D>();
         t.Build();
         return t;
@@ -36,26 +47,26 @@ public class Tunnel3D : MonoBehaviour
 
     void Awake() { Instance = this; }
 
+    float FromZ { get { return -BehindLength - HelixPeriod; } }
+    float ToZ { get { return AheadLength + HelixPeriod; } }
+
     void Build()
     {
-        // спирали: голубые по часовой, розовые — против, образуют решётку
         for (int h = 0; h < HelixCount; h++)
         {
             float phase = h * Mathf.PI * 2f / HelixCount;
-            _helices.Add(BuildHelix(phase, 1f, Cyan));
-            _helices.Add(BuildHelix(phase + Mathf.PI / HelixCount, -1f, Magenta));
+            BuildHelix(phase, 1f, Violet);
+            BuildHelix(phase + Mathf.PI / HelixCount, -1f, Amber);
         }
 
-        // кольца
-        for (float z = StartZ; z <= EndZ + 0.01f; z += RingSpacing)
+        for (float z = FromZ; z <= ToZ + 0.01f; z += RingSpacing)
         {
-            _rings.Add(BuildRing(z, Radius, 0.35f, Cyan));
+            _rings.Add(BuildRing(z));
+            _ringZ.Add(z);
         }
-
-        BuildGate();
     }
 
-    LineRenderer NewLine(string name, int points, float width, Color color)
+    LineRenderer NewLine(string name, int points, float width)
     {
         GameObject go = new GameObject(name);
         go.transform.SetParent(transform, false);
@@ -65,122 +76,114 @@ public class Tunnel3D : MonoBehaviour
         lr.startWidth = width;
         lr.endWidth = width;
         lr.sharedMaterial = Factory3D.GlowFlat(Color.white);
-        lr.startColor = color;
-        lr.endColor = color;
         lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         lr.receiveShadows = false;
         lr.numCapVertices = 2;
         return lr;
     }
 
-    LineRenderer BuildHelix(float phase, float direction, Color color)
+    // Прозрачность вдоль линии: растворяется у обоих концов, ярче всего рядом с игроком.
+    Gradient FadeGradient(Color color, float peakAlpha)
     {
-        int points = Mathf.CeilToInt((EndZ - StartZ) / 3f) + 1;
-        LineRenderer lr = NewLine("Helix", points, 0.45f, color);
-        for (int i = 0; i < points; i++)
-        {
-            float z = Mathf.Lerp(StartZ, EndZ, i / (points - 1f));
-            float a = phase + direction * (z - StartZ) * TurnsPerUnit * Mathf.PI * 2f;
-            lr.SetPosition(i, new Vector3(Mathf.Cos(a) * Radius, Mathf.Sin(a) * Radius, z));
-        }
-        // спираль ярче у врат, тусклее у старта
+        float len = ToZ - FromZ;
+        float playerT = (0f - FromZ) / len;
+        float behindFade = (-BehindLength * 0.4f - FromZ) / len;
+        float aheadFade = (AheadLength * 0.55f - FromZ) / len;
+
         Gradient g = new Gradient();
-        g.SetKeys(new[] { new GradientColorKey(color, 0f), new GradientColorKey(color, 1f) },
-                  new[] { new GradientAlphaKey(0.35f, 0f), new GradientAlphaKey(0.9f, 1f) });
-        lr.colorGradient = g;
-        return lr;
+        g.SetKeys(
+            new[] { new GradientColorKey(color, 0f), new GradientColorKey(color, 1f) },
+            new[]
+            {
+                new GradientAlphaKey(0f, 0f),
+                new GradientAlphaKey(0f, Mathf.Max(0.01f, behindFade - 0.05f)),
+                new GradientAlphaKey(peakAlpha, playerT),
+                new GradientAlphaKey(peakAlpha * 0.8f, aheadFade),
+                new GradientAlphaKey(0f, 1f)
+            });
+        return g;
     }
 
-    LineRenderer BuildRing(float z, float radius, float width, Color color)
+    void BuildHelix(float phase, float direction, Color color)
     {
-        const int points = 64;
-        LineRenderer lr = NewLine("Ring", points, width, color);
+        int points = Mathf.CeilToInt((ToZ - FromZ) / 4f) + 1;
+        LineRenderer lr = NewLine("Helix", points, 0.9f);
+        for (int i = 0; i < points; i++)
+        {
+            float z = Mathf.Lerp(FromZ, ToZ, i / (points - 1f));
+            float a = phase + direction * z / HelixPeriod * Mathf.PI * 2f;
+            lr.SetPosition(i, new Vector3(Mathf.Cos(a) * Radius, Mathf.Sin(a) * Radius, z));
+        }
+        lr.colorGradient = FadeGradient(color, 0.95f);
+    }
+
+    LineRenderer BuildRing(float z)
+    {
+        const int points = 96;
+        LineRenderer lr = NewLine("Ring", points, 0.6f);
         lr.loop = true;
         for (int i = 0; i < points; i++)
         {
             float a = i * Mathf.PI * 2f / points;
-            lr.SetPosition(i, new Vector3(Mathf.Cos(a) * radius, Mathf.Sin(a) * radius, z));
+            lr.SetPosition(i, new Vector3(Mathf.Cos(a) * Radius, Mathf.Sin(a) * Radius, z));
         }
         return lr;
     }
 
-    void BuildGate()
+    void LateUpdate()
     {
-        GameObject gate = new GameObject("Enemy_Gate");
-        gate.transform.SetParent(transform, false);
-        gate.transform.position = GatePosition;
-        _gate = gate.transform;
+        float pz = CurrentPlayerZ;
 
-        LineRenderer outer = BuildRing(0f, Radius * 1.25f, 1.6f, GateRed);
-        outer.transform.SetParent(_gate, false);
-        LineRenderer inner = BuildRing(0f, Radius * 0.9f, 0.8f, new Color(1f, 0.45f, 0.1f));
-        inner.transform.SetParent(_gate, false);
-        Factory3D.GlowBall(_gate, Vector3.zero, Radius * 3.2f, new Color(1f, 0.1f, 0.05f, 0.35f));
+        // перескок ровно на период узора — визуально ничего не меняется
+        float anchor = Mathf.Floor(pz / HelixPeriod) * HelixPeriod;
+        transform.position = new Vector3(0f, 0f, anchor);
 
-        // маркер-надпись
-        GameObject label = new GameObject("Gate_Label");
-        label.transform.SetParent(_gate, false);
-        label.transform.localPosition = new Vector3(0f, Radius * 1.6f, 0f);
-        TextMesh tm = label.AddComponent<TextMesh>();
-        tm.text = "ENEMY GATE";
-        tm.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-        tm.GetComponent<MeshRenderer>().sharedMaterial = tm.font.material;
-        tm.fontSize = 64;
-        tm.characterSize = 1.2f;
-        tm.anchor = TextAnchor.MiddleCenter;
-        tm.color = GateRed;
-        label.AddComponent<Billboard3D>();
-    }
-
-    void Update()
-    {
-        // бегущие огни: импульс идёт от старта к вратам — "лети туда"
-        float t = Time.time * 1.2f;
+        // кольца: бегущие огни уходят вперёд (куда лететь) и растворяются вдали
+        float t = Time.time * 1.1f;
         for (int i = 0; i < _rings.Count; i++)
         {
-            float wave = Mathf.Repeat(t - i * 0.18f, 1.6f);
-            float glow = Mathf.Clamp01(1f - wave * 2.5f);
-            Color c = Color.Lerp(Cyan * 0.55f, Color.white, glow);
-            c.a = 0.45f + 0.55f * glow;
+            float worldZ = anchor + _ringZ[i];
+            float rel = worldZ - pz;
+
+            float fade;
+            if (rel < 0f) fade = Mathf.Clamp01(1f + rel / (BehindLength * 0.6f));
+            else fade = Mathf.Clamp01(1f - rel / (AheadLength * 0.85f));
+            fade = fade * fade;
+
+            float wave = Mathf.Repeat(t - worldZ / (RingSpacing * 4f), 1.4f);
+            float glow = Mathf.Clamp01(1f - wave * 2.2f);
+
+            Color c = Color.Lerp(Ice * 0.6f, Color.white, glow);
+            c.a = (0.35f + 0.65f * glow) * fade;
             _rings[i].startColor = c;
             _rings[i].endColor = c;
-            float w = 0.35f + 0.5f * glow;
+            float w = 0.5f + 0.9f * glow;
             _rings[i].startWidth = w;
             _rings[i].endWidth = w;
-        }
-
-        if (_gate != null)
-        {
-            _gate.Rotate(0f, 0f, 20f * Time.deltaTime, Space.Self);
-            float pulse = 1f + 0.06f * Mathf.Sin(Time.time * 3f);
-            _gate.localScale = Vector3.one * pulse;
         }
     }
 
     // ---------------- Геометрия для остальных систем ----------------
     public Vector3 ClosestPointOnAxis(Vector3 p)
     {
-        return new Vector3(0f, 0f, Mathf.Clamp(p.z, StartZ - 40f, EndZ + 60f));
+        return new Vector3(0f, 0f, p.z);
     }
 
-    // Держит точку в пределах арены вокруг туннеля (можно вылететь из туннеля, но не улететь в бесконечность).
+    // Путь бесконечный вдоль Z; ограничено только расстояние от оси.
     public Vector3 ClampToArena(Vector3 p, out bool clamped)
     {
-        Vector3 c = ClosestPointOnAxis(p);
-        Vector3 d = p - c;
-        clamped = false;
-        if (d.magnitude > ArenaRadius)
+        Vector2 r = new Vector2(p.x, p.y);
+        clamped = r.magnitude > ArenaRadius;
+        if (clamped)
         {
-            p = c + d.normalized * ArenaRadius;
-            clamped = true;
+            r = r.normalized * ArenaRadius;
+            p = new Vector3(r.x, r.y, p.z);
         }
-        if (p.z < StartZ - 80f) { p.z = StartZ - 80f; clamped = true; }
-        if (p.z > EndZ + 90f) { p.z = EndZ + 90f; clamped = true; }
         return p;
     }
 
     public bool IsInsideTunnel(Vector3 p, float margin)
     {
-        return p.z > StartZ && p.z < EndZ && new Vector2(p.x, p.y).magnitude < Radius + margin;
+        return new Vector2(p.x, p.y).magnitude < Radius + margin;
     }
 }

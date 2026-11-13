@@ -585,7 +585,8 @@ public static class Factory3D
         return ps;
     }
 
-    public static void Starfield(int count, float minRadius, float maxRadius)
+    // Далёкие звёзды: локальные частицы, объект следует за камерой (звёзды "на бесконечности").
+    public static GameObject Starfield(int count, float minRadius, float maxRadius)
     {
         GameObject go = new GameObject("Starfield");
         ParticleSystem ps = go.AddComponent<ParticleSystem>();
@@ -596,7 +597,7 @@ public static class Factory3D
         main.startLifetime = 100000f;
         main.startSpeed = 0f;
         main.maxParticles = count;
-        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.simulationSpace = ParticleSystemSimulationSpace.Local;
         var emission = ps.emission;
         emission.enabled = false;
         var shape = ps.shape;
@@ -614,6 +615,60 @@ public static class Factory3D
             ep.startLifetime = 100000f;
             ps.Emit(ep, 1);
         }
+        go.AddComponent<FollowCamera3D>();
+        return go;
+    }
+
+    // Космическая пыль вокруг игрока: неподвижные в мире частицы дают ощущение скорости.
+    public static ParticleSystem SpaceDust(Transform follow)
+    {
+        GameObject go = new GameObject("Space_Dust");
+        go.transform.SetParent(follow, false);
+        go.transform.localPosition = new Vector3(0f, 0f, 30f);
+        ParticleSystem ps = go.AddComponent<ParticleSystem>();
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        var main = ps.main;
+        main.loop = true;
+        main.startLifetime = 3f;
+        main.startSpeed = 0f;
+        main.startSize = new ParticleSystem.MinMaxCurve(0.12f, 0.35f);
+        main.startColor = new Color(0.8f, 0.9f, 1f, 0.55f);
+        main.maxParticles = 600;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        var emission = ps.emission;
+        emission.rateOverTime = 160;
+        var shape = ps.shape;
+        shape.shapeType = ParticleSystemShapeType.Box;
+        shape.scale = new Vector3(120f, 120f, 140f);
+        var col = ps.colorOverLifetime;
+        col.enabled = true;
+        Gradient g = new Gradient();
+        g.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+                  new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.2f), new GradientAlphaKey(1f, 0.7f), new GradientAlphaKey(0f, 1f) });
+        col.color = g;
+        go.GetComponent<ParticleSystemRenderer>().sharedMaterial = Glow(Color.white);
+        ps.Play();
+        return ps;
+    }
+}
+
+// Держит объект на постоянном смещении от камеры (без поворота) —
+// так фон (звёзды, планета, туманности) не приближается, сколько ни лети.
+public class FollowCamera3D : MonoBehaviour
+{
+    private Vector3 _offset;
+    private bool _init;
+
+    void LateUpdate()
+    {
+        Camera cam = Camera.main;
+        if (cam == null) return;
+        if (!_init)
+        {
+            _offset = transform.position - cam.transform.position;
+            _init = true;
+        }
+        transform.position = cam.transform.position + _offset;
     }
 }
 

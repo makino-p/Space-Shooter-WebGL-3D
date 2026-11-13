@@ -36,6 +36,9 @@ public class Player3D : Hittable3D
     public int MaxAmmo = 15;
     public float FireRate = 0.18f;
     public float ShotSpeed = 130f;
+    public float ShotLifetime = 7f;       // дальность ~900 — астероид можно сбить с любой видимой дистанции
+    public float AimAssistRange = 90f;    // на этой дистанции пули сами доворачивают к врагу
+    public float AimAssistCone = 22f;     // насколько точно нужно целиться (градусы)
     public float PowerupDuration = 5f;
 
     [Header("Health")]
@@ -305,12 +308,12 @@ public class Player3D : Hittable3D
             for (int i = -1; i <= 1; i++)
             {
                 Vector3 dir = Quaternion.AngleAxis(i * 4f, transform.up) * aim;
-                Projectile3D.Spawn(Faction3D.Player, transform.position + transform.forward * 2f + transform.right * i * 1.5f, dir, ShotSpeed, new Color(1f, 0.9f, 0.3f));
+                Projectile3D.Spawn(Faction3D.Player, transform.position + transform.forward * 2f + transform.right * i * 1.5f, dir, ShotSpeed, new Color(1f, 0.9f, 0.3f), ShotLifetime).EnableAimAssist(AimAssistRange, AimAssistCone);
             }
         }
         else
         {
-            Projectile3D.Spawn(Faction3D.Player, gun, aim, ShotSpeed, shotColor);
+            Projectile3D.Spawn(Faction3D.Player, gun, aim, ShotSpeed, shotColor, ShotLifetime).EnableAimAssist(AimAssistRange, AimAssistCone);
         }
 
         if (Game3D.Instance != null)

@@ -232,7 +232,7 @@ public class UI3D : MonoBehaviour
     {
         _hint.text = "MOUSE / ARROWS - steer    W/S - throttle up/down    X - full stop    A/D - strafe    Q/E - down/up\n" +
                      "SPACE / LMB - fire    SHIFT - boost    C - pull pickups    click to capture mouse, ESC to release\n" +
-                     "Fly through the neon tunnel - enemies come from the red ENEMY GATE";
+                     "Follow the neon spiral path - enemies come from far ahead along it";
         StartCoroutine(HideAfter(_hint.gameObject, 14f));
     }
 

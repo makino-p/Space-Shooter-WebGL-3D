@@ -24,7 +24,7 @@ public class Asteroid3D : Hittable3D
         a.Size = size;
         a.Faction = Faction3D.Neutral;
         a.Radius = size * 0.55f;
-        a._hp = starter ? 3 : Mathf.Max(1, Mathf.RoundToInt(size / 3f));
+        a._hp = 1; // любой астероид разрушается одним выстрелом
         return a;
     }
 
