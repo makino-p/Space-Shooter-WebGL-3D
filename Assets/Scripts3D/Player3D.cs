@@ -183,9 +183,45 @@ public class Player3D : Hittable3D
 
         _yaw = Mathf.SmoothDampAngle(_yaw, _targetYaw, ref _yawVelocity, RotationSmoothTime);
         _pitch = Mathf.SmoothDampAngle(_pitch, _targetPitch, ref _pitchVelocity, RotationSmoothTime);
+
+        HandleSpin();
+
         transform.rotation = Quaternion.Euler(_pitch, _yaw, 0f);
 
-        _yawInput = Mathf.Clamp(_yawVelocity / 120f, -1f, 1f);
+        _yawInput = Mathf.Clamp((_yawVelocity + _spinRate) / 120f, -1f, 1f);
+    }
+
+    // ---------- Разворот на правую кнопку мыши ----------
+    // Чем дольше держишь ПКМ, тем быстрее корабль вращается вокруг своей оси.
+    // Скорость растёт линейно, поэтому за SpinFullTurnTime секунд набегает ровно 360°.
+    // После отпускания вращение плавно затухает, без рывка.
+    [Header("Spin (правая кнопка мыши)")]
+    public float SpinFullTurnTime = 5f;   // полный оборот за 5 секунд удержания
+    public float SpinStopRate = 260f;     // как быстро гаснет вращение после отпускания (град/с²)
+    private float _spinHeld;
+    private float _spinRate;              // текущая скорость вращения, град/с
+
+    void HandleSpin()
+    {
+        float T = Mathf.Max(0.5f, SpinFullTurnTime);
+        if (Input.GetMouseButton(1))
+        {
+            _spinHeld += Time.deltaTime;
+            float maxRate = 720f / T;                                  // скорость в конце первого оборота
+            _spinRate = Mathf.Min(720f * _spinHeld / (T * T), maxRate); // интеграл = 360° * (t/T)²
+        }
+        else
+        {
+            _spinHeld = 0f;
+            _spinRate = Mathf.MoveTowards(_spinRate, 0f, SpinStopRate * Time.deltaTime);
+        }
+
+        if (_spinRate > 0.001f)
+        {
+            float delta = _spinRate * Time.deltaTime;
+            _yaw += delta;
+            _targetYaw += delta; // цель поворачивается вместе с кораблём, чтобы сглаживание не тянуло назад
+        }
     }
 
     void HandleThrusters()

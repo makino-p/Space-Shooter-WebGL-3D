@@ -74,6 +74,8 @@ public class Game3D : MonoBehaviour
 
     private Player3D _player;
     private bool _wavesStarted;
+    private float _movingTime;              // сколько секунд игрок уже летит
+    public float WaveStartAfterMoving = 5f; // враги начинают появляться после 5 с движения
     private bool _stopSpawning;
     private int _currentWave;
 
@@ -111,8 +113,6 @@ public class Game3D : MonoBehaviour
 
         CameraRig.SetTarget(playerGo.transform);
 
-        // стартовый астероид прямо по курсу — уничтожь его, чтобы начать
-        Asteroid3D.Spawn(new Vector3(0f, -22f, 50f), 6f, true);
         SpawnAsteroidField(45);
     }
 
@@ -120,7 +120,7 @@ public class Game3D : MonoBehaviour
     {
         UI.UpdateScore(0);
         UI.SetWave(0, TotalWaves);
-        UI.ShowMessage("DESTROY THE ASTEROID TO BEGIN", 4f, Color.white);
+        UI.ShowMessage("FLY (W) - ENEMIES ARRIVE IN 5 SECONDS", 2f, Color.white);
         UI.ShowControlsHint();
         StartCoroutine(TransportRoutine());
     }
@@ -278,6 +278,21 @@ public class Game3D : MonoBehaviour
             }
         }
         RecycleAsteroids();
+        TrackPlayerMovement();
+    }
+
+    // Волны стартуют, когда игрок суммарно пролетел WaveStartAfterMoving секунд (стоять на месте не считается).
+    void TrackPlayerMovement()
+    {
+        if (_wavesStarted || _player == null || !_player.IsAlive) return;
+        if (_player.Velocity.magnitude > 2f)
+        {
+            _movingTime += Time.deltaTime;
+            if (_movingTime >= WaveStartAfterMoving)
+            {
+                StartWaves();
+            }
+        }
     }
 
     // Бесконечный путь: астероиды, оставшиеся далеко позади, переносятся далеко вперёд.

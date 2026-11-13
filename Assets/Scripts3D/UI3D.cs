@@ -135,7 +135,7 @@ public class UI3D : MonoBehaviour
         throttle01 = Mathf.Clamp01(throttle01);
         _throttleFill.anchorMax = new Vector2(1f, throttle01);
         _throttleLabel.text = "THROTTLE " + Mathf.RoundToInt(throttle01 * 100f) + "%\nSPEED " + Mathf.RoundToInt(speed) +
-                              (throttle01 <= 0.001f && speed < 0.5f ? "\n<color=#ffcc55>W - go</color>" : "");
+                              (throttle01 <= 0.001f && speed < 0.5f && Time.timeSinceLevelLoad < 2f ? "\n<color=#ffcc55>W - go</color>" : "");
         _throttleLabel.supportRichText = true;
     }
 
@@ -231,9 +231,9 @@ public class UI3D : MonoBehaviour
     public void ShowControlsHint()
     {
         _hint.text = "MOUSE / ARROWS - steer    W/S - throttle up/down    X - full stop    A/D - strafe    Q/E - down/up\n" +
-                     "SPACE / LMB - fire    SHIFT - boost    C - pull pickups    click to capture mouse, ESC to release\n" +
-                     "Follow the neon spiral path - enemies come from far ahead along it";
-        StartCoroutine(HideAfter(_hint.gameObject, 14f));
+                     "SPACE / LMB - fire    RMB (hold) - spin    SHIFT - boost    C - pull pickups    click to capture mouse, ESC to release\n" +
+                     "Follow the energy beam - enemies come along it after 5 seconds of flight";
+        StartCoroutine(HideAfter(_hint.gameObject, 2f));
     }
 
     public void ShowGameOver(bool win)

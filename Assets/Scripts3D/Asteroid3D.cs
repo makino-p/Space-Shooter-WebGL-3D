@@ -66,7 +66,7 @@ public class Asteroid3D : Hittable3D
         if (Game3D.Instance != null)
         {
             Game3D.PlaySound(Game3D.Instance.ExplosionClip, 0.6f, 0.7f);
-            if (IsStarter) Game3D.Instance.StartWaves();
+            // волны больше не зависят от астероида — они стартуют после 5 с полёта (Game3D)
         }
         Destroy(gameObject);
     }
