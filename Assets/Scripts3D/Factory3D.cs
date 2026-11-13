@@ -151,7 +151,7 @@ public static class Factory3D
     // Копия материала спрайта с оттенком (кэшируется).
     static Material Tinted(Material source, Color tint, float emission)
     {
-        string key = "T" + source.GetInstanceID() + tint + emission;
+        string key = "T" + source.GetHashCode() + tint + emission;
         Material m;
         if (_cache.TryGetValue(key, out m)) return m;
         m = new Material(source);
@@ -406,7 +406,7 @@ public static class Factory3D
         label.transform.localPosition = new Vector3(0, 1.9f, 0);
         TextMesh tm = label.AddComponent<TextMesh>();
         tm.text = PickupLabel(type);
-        tm.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        tm.font = Compat.DefaultFont;
         tm.GetComponent<MeshRenderer>().sharedMaterial = tm.font.material;
         tm.characterSize = 0.25f;
         tm.fontSize = 48;

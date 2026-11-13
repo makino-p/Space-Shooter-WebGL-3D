@@ -166,7 +166,7 @@ public class UI_Manager : MonoBehaviour
         labelRect.anchoredPosition = new Vector2(0f, 2f);
         labelRect.sizeDelta = new Vector2(0f, 20f);
         _thrusterLabel = label.GetComponent<Text>();
-        _thrusterLabel.font = _scoreText != null ? _scoreText.font : Resources.GetBuiltinResource<Font>("Arial.ttf");
+        _thrusterLabel.font = _scoreText != null ? _scoreText.font : Compat.DefaultFont;
         _thrusterLabel.fontSize = 14;
         _thrusterLabel.alignment = TextAnchor.LowerLeft;
         _thrusterLabel.horizontalOverflow = HorizontalWrapMode.Overflow;
@@ -202,7 +202,7 @@ public class UI_Manager : MonoBehaviour
             rect.anchoredPosition = new Vector2(0f, 60f);
             rect.sizeDelta = new Vector2(600f, 60f);
             _messageText = go.GetComponent<Text>();
-            _messageText.font = _scoreText != null ? _scoreText.font : Resources.GetBuiltinResource<Font>("Arial.ttf");
+            _messageText.font = _scoreText != null ? _scoreText.font : Compat.DefaultFont;
             _messageText.fontSize = 36;
             _messageText.alignment = TextAnchor.MiddleCenter;
             _messageText.horizontalOverflow = HorizontalWrapMode.Overflow;
@@ -260,7 +260,7 @@ public class UI_Manager : MonoBehaviour
             labelRect.anchorMax = Vector2.one;
             labelRect.offsetMin = labelRect.offsetMax = Vector2.zero;
             Text t = label.GetComponent<Text>();
-            t.font = _scoreText != null ? _scoreText.font : Resources.GetBuiltinResource<Font>("Arial.ttf");
+            t.font = _scoreText != null ? _scoreText.font : Compat.DefaultFont;
             t.fontSize = 13;
             t.alignment = TextAnchor.MiddleCenter;
             t.color = Color.white;

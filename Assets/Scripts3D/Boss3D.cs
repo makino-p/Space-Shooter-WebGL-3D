@@ -189,7 +189,7 @@ public class Boss3D : Hittable3D
     IEnumerator DeathSequence()
     {
         _alive = false;
-        foreach (Beam3D b in FindObjectsOfType<Beam3D>()) b.Stop();
+        foreach (Beam3D b in Compat.FindAll<Beam3D>()) b.Stop();
         if (Game3D.Instance != null)
         {
             Game3D.Instance.UI.HideBossHealth();

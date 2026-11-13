@@ -306,7 +306,7 @@ public class Enemy : MonoBehaviour
         }
         _nextPickupCheck = Time.time + 0.25f;
 
-        foreach (Powerup powerup in FindObjectsOfType<Powerup>())
+        foreach (Powerup powerup in Compat.FindAll<Powerup>())
         {
             Vector3 d = powerup.transform.position - transform.position;
             if (d.y < -0.5f && d.y > -7f && Mathf.Abs(d.x) < 0.8f)

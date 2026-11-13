@@ -190,7 +190,7 @@ public class Boss : MonoBehaviour
         if (_uiManager != null) _uiManager.HideBossHealth();
 
         // убрать оставшиеся лучи босса
-        foreach (EnemyBeam beam in FindObjectsOfType<EnemyBeam>())
+        foreach (EnemyBeam beam in Compat.FindAll<EnemyBeam>())
         {
             Destroy(beam.gameObject);
         }

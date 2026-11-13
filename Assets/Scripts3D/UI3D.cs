@@ -26,7 +26,7 @@ public class UI3D : MonoBehaviour
 
     void Awake()
     {
-        _font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        _font = Compat.DefaultFont;
 
         GameObject canvasGo = new GameObject("UI_Canvas");
         _canvas = canvasGo.AddComponent<Canvas>();
