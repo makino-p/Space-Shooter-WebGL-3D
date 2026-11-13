@@ -108,6 +108,84 @@ public static class Factory3D
         return g;
     }
 
+    // ---------------- Импортированные корабли (F3 Corvette, Star Sparrow) ----------------
+    private static GameObject _playerPrefab;
+    private static GameObject[] _enemyPrefabs;
+    private static Material[] _enemyMats;
+    private static Vector3 _playerEuler, _enemyEuler;
+    private static float _playerLength = 7f, _enemyLength = 5f, _bossLength = 26f;
+    private static Vector3[] _importedGuns, _importedEngines;
+
+    public static bool HasImportedPlayer { get { return _playerPrefab != null; } }
+    public static bool HasImportedEnemies { get { return _enemyPrefabs != null && _enemyPrefabs.Length > 0 && _enemyMats != null && _enemyMats.Length == _enemyPrefabs.Length; } }
+
+    public static void SetImportedShips(GameObject player, Vector3 playerEuler, float playerLength,
+                                        GameObject[] enemies, Material[] enemyMats, Vector3 enemyEuler, float enemyLength, float bossLength)
+    {
+        _playerPrefab = player;
+        _playerEuler = playerEuler;
+        _playerLength = playerLength;
+        _enemyPrefabs = enemies;
+        _enemyMats = enemyMats;
+        _enemyEuler = enemyEuler;
+        _enemyLength = enemyLength;
+        _bossLength = bossLength;
+    }
+
+    // Ставит модель из префаба: поворот (нос по +Z), длина по Z = length, центр в нуле.
+    // Возвращает габариты уже подогнанной модели в локальных координатах parent.
+    static Bounds PlaceShipModel(GameObject prefab, Transform parent, Vector3 euler, float length, Material overrideMat)
+    {
+        GameObject holder = new GameObject(prefab.name + "_Model");
+        holder.transform.SetParent(parent, false);
+
+        GameObject inst = Object.Instantiate(prefab);
+        inst.name = prefab.name;
+        inst.transform.SetParent(holder.transform, false);
+        inst.transform.localPosition = Vector3.zero;
+        inst.transform.localRotation = Quaternion.Euler(euler) * prefab.transform.localRotation;
+        inst.transform.localScale = prefab.transform.localScale;
+
+        // лишнее из пака: физика и скрипты
+        foreach (Collider c in inst.GetComponentsInChildren<Collider>(true)) Object.Destroy(c);
+        foreach (Rigidbody rb in inst.GetComponentsInChildren<Rigidbody>(true)) Object.Destroy(rb);
+        foreach (MonoBehaviour mb in inst.GetComponentsInChildren<MonoBehaviour>(true)) Object.Destroy(mb);
+
+        Renderer[] renderers = inst.GetComponentsInChildren<Renderer>(true);
+        if (overrideMat != null)
+        {
+            foreach (Renderer r in renderers)
+            {
+                Material[] mats = new Material[r.sharedMaterials.Length];
+                for (int i = 0; i < mats.Length; i++) mats[i] = overrideMat;
+                r.sharedMaterials = mats;
+            }
+        }
+
+        // габариты в координатах holder (по вершинам границ мешей)
+        Bounds b = new Bounds();
+        bool has = false;
+        Matrix4x4 toHolder = holder.transform.worldToLocalMatrix;
+        foreach (MeshFilter mf in inst.GetComponentsInChildren<MeshFilter>(true))
+        {
+            if (mf.sharedMesh == null) continue;
+            Bounds mb = mf.sharedMesh.bounds;
+            Matrix4x4 m = toHolder * mf.transform.localToWorldMatrix;
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 corner = mb.center + Vector3.Scale(mb.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1));
+                Vector3 p = m.MultiplyPoint3x4(corner);
+                if (!has) { b = new Bounds(p, Vector3.zero); has = true; } else b.Encapsulate(p);
+            }
+        }
+        if (!has) return new Bounds(Vector3.zero, Vector3.one * length);
+
+        float scale = b.size.z > 0.0001f ? length / b.size.z : 1f;
+        holder.transform.localScale = Vector3.one * scale;
+        holder.transform.localPosition = -b.center * scale;
+        return new Bounds(Vector3.zero, b.size * scale);
+    }
+
     // ---------------- Модели из 2D-спрайтов ----------------
     private static Mesh _playerMesh, _enemyMesh, _asteroidMesh;
     private static Material _playerMat, _enemyMat, _asteroidMat;
@@ -126,10 +204,23 @@ public static class Factory3D
         _asteroidMesh = asteroid; _asteroidMat = asteroidMat;
     }
 
+    // Точки пушек игрока — передние края корабля (по габаритам модели).
+    public static Vector3[] PlayerGunPoints
+    {
+        get
+        {
+            if (_importedGuns != null) return _importedGuns;
+            return HasSpriteModels
+                ? new[] { new Vector3(-0.72f, 0.1f, 2.9f), new Vector3(0.72f, 0.1f, 2.9f) }
+                : new[] { new Vector3(-1.9f, -0.12f, 1.0f), new Vector3(1.9f, -0.12f, 1.0f) };
+        }
+    }
+
     public static Vector3[] PlayerEnginePoints
     {
         get
         {
+            if (_importedEngines != null) return _importedEngines;
             return HasSpriteModels
                 ? new[] { new Vector3(-0.28f, 0f, -2.35f), new Vector3(0.28f, 0f, -2.35f) }
                 : new[] { new Vector3(-0.55f, -0.1f, -1.8f), new Vector3(0.55f, -0.1f, -1.8f) };
@@ -165,6 +256,24 @@ public static class Factory3D
     // ---------------- Корабль игрока ----------------
     public static GameObject BuildPlayerShip(Transform parent)
     {
+        if (HasImportedPlayer)
+        {
+            // Federation Corvette F3
+            GameObject model = new GameObject("Ship_Model");
+            model.transform.SetParent(parent, false);
+            Bounds b = PlaceShipModel(_playerPrefab, model.transform, _playerEuler, _playerLength, null);
+            float halfW = b.extents.x, halfL = b.extents.z;
+            _importedGuns = new[] { new Vector3(-halfW * 0.35f, 0f, halfL * 0.85f), new Vector3(halfW * 0.35f, 0f, halfL * 0.85f) };
+            _importedEngines = new[] { new Vector3(-halfW * 0.18f, 0f, -halfL * 0.98f), new Vector3(halfW * 0.18f, 0f, -halfL * 0.98f) };
+            foreach (Vector3 e in _importedEngines)
+            {
+                GlowBall(model.transform, e + new Vector3(0f, 0f, -0.2f), 1.4f, new Color(0.4f, 0.75f, 1f, 1f));
+            }
+            return model;
+        }
+        _importedGuns = null;
+        _importedEngines = null;
+
         if (HasSpriteModels)
         {
             GameObject model = new GameObject("Ship_Model");
@@ -228,6 +337,23 @@ public static class Factory3D
 
     public static GameObject BuildEnemyShip(Transform parent, Enemy3DType type)
     {
+        if (HasImportedEnemies)
+        {
+            // Star Sparrow: у каждого типа врага своя модель и свой цвет (последний в списке — босс)
+            int count = Mathf.Max(1, _enemyPrefabs.Length - 1);
+            int i = (int)type % count;
+            GameObject model = new GameObject("Enemy_Model");
+            model.transform.SetParent(parent, false);
+            Bounds b = PlaceShipModel(_enemyPrefabs[i], model.transform, _enemyEuler, _enemyLength, _enemyMats[i]);
+            Color c = EnemyColor(type);
+            GlowBall(model.transform, new Vector3(0f, 0f, -b.extents.z * 0.95f), 1.6f, c);  // двигатель
+            if (type == Enemy3DType.RearGunner)
+                GlowBall(model.transform, new Vector3(0f, b.extents.y * 0.5f, -b.extents.z), 1.2f, c); // хвостовая пушка
+            if (type == Enemy3DType.Beamer)
+                GlowBall(model.transform, new Vector3(0f, 0f, b.extents.z * 1.05f), 1.8f, c);          // излучатель луча
+            return model;
+        }
+
         if (_enemyMesh != null && _enemyMat != null)
         {
             GameObject model = new GameObject("Enemy_Model");
@@ -310,6 +436,19 @@ public static class Factory3D
     // ---------------- Босс ----------------
     public static GameObject BuildBoss(Transform parent)
     {
+        if (HasImportedEnemies)
+        {
+            // босс — самый крупный корабль Star Sparrow
+            int last = _enemyPrefabs.Length - 1;
+            GameObject model = new GameObject("Boss_Model");
+            model.transform.SetParent(parent, false);
+            Bounds b = PlaceShipModel(_enemyPrefabs[last], model.transform, _enemyEuler, _bossLength, _enemyMats[last]);
+            GlowBall(model.transform, new Vector3(0f, 0f, b.extents.z * 0.6f), 8f, new Color(1f, 0.3f, 0.1f, 1f));           // ядро
+            GlowBall(model.transform, new Vector3(-b.extents.x * 0.25f, 0f, -b.extents.z), 5f, new Color(1f, 0.35f, 0.15f, 1f));
+            GlowBall(model.transform, new Vector3(b.extents.x * 0.25f, 0f, -b.extents.z), 5f, new Color(1f, 0.35f, 0.15f, 1f));
+            return model;
+        }
+
         if (_enemyMesh != null && _enemyMat != null)
         {
             // босс — огромный вражеский корабль из того же спрайта, в красных тонах
@@ -478,57 +617,14 @@ public static class Factory3D
     }
 
     // ---------------- Эффекты ----------------
-    public static void Explosion(Vector3 position, float size, Color color)
+    public static void Explosion(Vector3 position, float size, Color color, Vector3 velocity = default(Vector3))
     {
-        GameObject go = new GameObject("Explosion");
-        go.transform.position = position;
+        Effects3D.Explosion(position, size, color, velocity);
+    }
 
-        ParticleSystem ps = go.AddComponent<ParticleSystem>();
-        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-        var main = ps.main;
-        main.duration = 1f;
-        main.loop = false;
-        main.startLifetime = new ParticleSystem.MinMaxCurve(0.4f, 1.1f);
-        main.startSpeed = new ParticleSystem.MinMaxCurve(4f * size, 14f * size);
-        main.startSize = new ParticleSystem.MinMaxCurve(0.6f * size, 2.2f * size);
-        main.startColor = new ParticleSystem.MinMaxGradient(color, new Color(1f, 0.95f, 0.6f));
-        main.simulationSpace = ParticleSystemSimulationSpace.World;
-        main.maxParticles = 200;
-
-        var emission = ps.emission;
-        emission.rateOverTime = 0;
-        emission.SetBursts(new[] { new ParticleSystem.Burst(0f, (short)(40 * Mathf.Clamp(size, 0.5f, 3f))) });
-
-        var shape = ps.shape;
-        shape.shapeType = ParticleSystemShapeType.Sphere;
-        shape.radius = 0.5f * size;
-
-        var col = ps.colorOverLifetime;
-        col.enabled = true;
-        Gradient g = new Gradient();
-        g.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(color, 0.4f), new GradientColorKey(new Color(0.2f, 0.05f, 0f), 1f) },
-                  new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0.8f, 0.5f), new GradientAlphaKey(0f, 1f) });
-        col.color = g;
-
-        var sizeOverLife = ps.sizeOverLifetime;
-        sizeOverLife.enabled = true;
-        sizeOverLife.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.EaseInOut(0f, 0.6f, 1f, 1.6f));
-
-        ParticleSystemRenderer r = go.GetComponent<ParticleSystemRenderer>();
-        r.sharedMaterial = Glow(Color.white);
-
-        ps.Play();
-        Object.Destroy(go, 2f);
-
-        // вспышка света
-        GameObject lightGo = new GameObject("Flash");
-        lightGo.transform.position = position;
-        Light l = lightGo.AddComponent<Light>();
-        l.type = LightType.Point;
-        l.color = color;
-        l.range = 25f * size;
-        l.intensity = 4f;
-        lightGo.AddComponent<FadeLight3D>();
+    public static void ShieldHit(Vector3 position, Color color)
+    {
+        Effects3D.ShieldHit(position, color);
     }
 
     public static ParticleSystem EngineTrail(Transform parent, Vector3 localPos, Color color, float size)

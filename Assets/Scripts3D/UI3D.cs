@@ -317,11 +317,16 @@ public class UI3D : MonoBehaviour
         UpdateMarkers(cam);
     }
 
+    // Стрелки навигации: показываются только для целей ВНЕ поля зрения,
+    // стоят у края экрана и указывают, куда повернуть. На видимых врагах ничего не рисуется.
     void UpdateMarkers(Camera cam)
     {
         int used = 0;
-        float margin = 28f;
+        float margin = 46f;
         Vector2 screen = new Vector2(Screen.width, Screen.height);
+        Vector2 center = screen * 0.5f;
+        float uiScale = _canvas.scaleFactor > 0f ? _canvas.scaleFactor : 1f;
+        Vector3 camPos = cam.transform.position;
 
         foreach (Hittable3D h in Hittable3D.All)
         {
@@ -333,41 +338,42 @@ public class UI3D : MonoBehaviour
 
             Vector3 sp = cam.WorldToScreenPoint(h.transform.position);
             bool behind = sp.z < 0f;
-            if (behind) sp = -sp;
+            bool onScreen = !behind && sp.x > 0f && sp.x < screen.x && sp.y > 0f && sp.y < screen.y;
+            if (onScreen) continue; // видим — стрелка не нужна
 
-            bool onScreen = !behind && sp.x > margin && sp.x < screen.x - margin && sp.y > margin && sp.y < screen.y - margin;
-            Vector2 pos = new Vector2(sp.x, sp.y);
-            if (!onScreen)
-            {
-                // прижать к краю экрана по направлению на цель
-                Vector2 center = screen * 0.5f;
-                Vector2 d = pos - center;
-                if (d.sqrMagnitude < 0.01f) d = Vector2.down;
-                float sx = (center.x - margin) / Mathf.Max(Mathf.Abs(d.x), 0.001f);
-                float sy = (center.y - margin) / Mathf.Max(Mathf.Abs(d.y), 0.001f);
-                pos = center + d * Mathf.Min(sx, sy);
-            }
+            float worldDist = Vector3.Distance(camPos, h.transform.position);
+            if (isPickup && worldDist > 220f) continue; // далёкие пикапы не засоряют экран
 
-            Image m = GetMarker(used++);
+            // направление на цель в плоскости экрана (для целей позади — зеркально)
+            Vector2 d = new Vector2(sp.x, sp.y) - center;
+            if (behind) d = -d;
+            if (d.sqrMagnitude < 0.01f) d = Vector2.down;
+            float sx = (center.x - margin) / Mathf.Max(Mathf.Abs(d.x), 0.001f);
+            float sy = (center.y - margin) / Mathf.Max(Mathf.Abs(d.y), 0.001f);
+            Vector2 pos = center + d * Mathf.Min(sx, sy);
+
+            Image arrow = GetMarker(used++);
             Color c;
-            if (isEnemy)
-            {
-                Boss3D boss = h as Boss3D;
-                c = boss != null ? new Color(1f, 0.15f, 0.1f) : new Color(1f, 0.3f, 0.25f);
-            }
+            bool isBoss = h is Boss3D;
+            if (isEnemy) c = isBoss ? new Color(1f, 0.15f, 0.1f) : new Color(1f, 0.35f, 0.25f);
             else
             {
                 Pickup3D p = h as Pickup3D;
                 c = p != null ? Factory3D.PickupColor(p.Type) : Color.white;
             }
-            c.a = onScreen ? 0.55f : 0.9f;
-            m.color = c;
-            float size = onScreen ? (isEnemy ? 26f : 18f) : (isEnemy ? 12f : 10f);
-            if (h is Boss3D) size *= 2f;
-            m.rectTransform.sizeDelta = new Vector2(size, size);
-            m.rectTransform.position = new Vector3(pos.x, pos.y, 0f);
-            m.rectTransform.rotation = Quaternion.Euler(0, 0, 45f);
-            m.gameObject.SetActive(true);
+            // ближе — ярче и крупнее, плюс лёгкая пульсация
+            float near = Mathf.Clamp01(1f - worldDist / 300f);
+            float pulse = 1f + 0.12f * Mathf.Sin(Time.time * 8f + used);
+            c.a = 0.55f + 0.45f * near;
+            arrow.color = c;
+
+            float size = (isEnemy ? 26f : 18f) * (0.8f + 0.5f * near) * pulse * uiScale;
+            if (isBoss) size *= 1.8f;
+            arrow.rectTransform.sizeDelta = new Vector2(size, size) / uiScale;
+            arrow.rectTransform.position = new Vector3(pos.x, pos.y, 0f);
+            float angle = Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg - 90f; // спрайт стрелки смотрит вверх
+            arrow.rectTransform.rotation = Quaternion.Euler(0f, 0f, angle);
+            arrow.gameObject.SetActive(true);
         }
 
         for (int i = used; i < _markers.Count; i++)
@@ -380,12 +386,45 @@ public class UI3D : MonoBehaviour
     {
         while (_markers.Count <= index)
         {
-            Image img = MakeImage(_canvas.transform, "Marker", Color.white);
+            Image img = MakeImage(_canvas.transform, "Nav_Arrow", Color.white);
+            img.sprite = ArrowSprite;
             img.transform.SetAsFirstSibling();
             Outline o = img.gameObject.AddComponent<Outline>();
-            o.effectColor = new Color(0f, 0f, 0f, 0.6f);
+            o.effectColor = new Color(0f, 0f, 0f, 0.7f);
+            o.effectDistance = new Vector2(1.5f, -1.5f);
             _markers.Add(img);
         }
         return _markers[index];
+    }
+
+    private static Sprite _arrowSprite;
+
+    // Стрелка-наконечник (смотрит вверх), рисуется кодом.
+    static Sprite ArrowSprite
+    {
+        get
+        {
+            if (_arrowSprite != null) return _arrowSprite;
+            const int size = 64;
+            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.wrapMode = TextureWrapMode.Clamp;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float u = (x + 0.5f) / size - 0.5f;   // -0.5..0.5
+                    float v = (y + 0.5f) / size;          // 0..1 снизу вверх
+                    // наконечник: ширина сужается к верху, снизу вырез-"ласточкин хвост"
+                    float half = 0.46f * (1f - v);
+                    float notch = 0.28f - Mathf.Abs(u) * 0.9f;
+                    bool inside = Mathf.Abs(u) <= half && v >= Mathf.Max(0.04f, notch);
+                    float edge = Mathf.Clamp01((half - Mathf.Abs(u)) * size * 0.8f);
+                    tex.SetPixel(x, y, new Color(1f, 1f, 1f, inside ? edge : 0f));
+                }
+            }
+            tex.Apply();
+            _arrowSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
+            return _arrowSprite;
+        }
     }
 }

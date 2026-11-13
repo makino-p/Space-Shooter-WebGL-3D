@@ -16,6 +16,7 @@ public class Game3D : MonoBehaviour
     public AudioClip MusicClip;
     public Material LitMaterial;
     public Material GlowMaterial;
+    public Material SmokeMaterial;   // Legacy Particles/Alpha Blended — для дыма взрывов
 
     [Header("Models from 2D sprites (генерируются скриптом Setup3DScene)")]
     public Mesh PlayerShipMesh;
@@ -24,6 +25,16 @@ public class Game3D : MonoBehaviour
     public Material PlayerShipMaterial;
     public Material EnemyShipMaterial;
     public Material AsteroidMaterial;
+
+    [Header("Imported ships (F3 Corvette — игрок, Star Sparrow — враги и босс)")]
+    public GameObject PlayerShipPrefab;
+    public Vector3 PlayerShipEuler = Vector3.zero;   // доворот модели, чтобы нос смотрел по +Z
+    public float PlayerShipLength = 7f;
+    public GameObject[] EnemyShipPrefabs;            // по одному на тип врага, последний — босс
+    public Material[] EnemyShipMaterials;
+    public Vector3 EnemyShipEuler = Vector3.zero;
+    public float EnemyShipLength = 5.5f;
+    public float BossShipLength = 26f;
 
     [Header("Downloaded assets (NASA sky, Poly Haven rocks)")]
     public Material SkyboxMaterial;
@@ -66,8 +77,11 @@ public class Game3D : MonoBehaviour
         Instance = this;
         Factory3D.LitBase = LitMaterial;
         Factory3D.GlowBase = GlowMaterial;
+        Effects3D.SmokeBase = SmokeMaterial;
         Factory3D.SetSpriteModels(PlayerShipMesh, PlayerShipMaterial, EnemyShipMesh, EnemyShipMaterial, AsteroidMesh, AsteroidMaterial);
         Factory3D.SetRockModels(RockMeshes, RockMaterials);
+        Factory3D.SetImportedShips(PlayerShipPrefab, PlayerShipEuler, PlayerShipLength,
+                                   EnemyShipPrefabs, EnemyShipMaterials, EnemyShipEuler, EnemyShipLength, BossShipLength);
         Hittable3D.All.Clear();
         Projectile3D.Active.Clear();
         Pickup3D.Pickups.Clear();
@@ -179,9 +193,9 @@ public class Game3D : MonoBehaviour
                 if (tunnel != null)
                 {
                     // пояс астероидов вокруг туннеля, внутри туннеля чисто
-                    float z = Random.Range(-150f, 750f);
+                    float z = Random.Range(-80f, 600f);
                     Vector2 dir = Random.insideUnitCircle.normalized;
-                    float r = Random.Range(tunnel.Radius + 15f, tunnel.Radius + 170f);
+                    float r = Random.Range(tunnel.Radius + 8f, tunnel.Radius + 110f);
                     pos = new Vector3(dir.x * r, dir.y * r, z);
                 }
                 else
@@ -275,8 +289,8 @@ public class Game3D : MonoBehaviour
             if (rel < -220f || rel > 900f)
             {
                 Vector2 dir = Random.insideUnitCircle.normalized;
-                float r = Random.Range(tunnel.Radius + 15f, tunnel.Radius + 170f);
-                a.transform.position = new Vector3(dir.x * r, dir.y * r, pz + Random.Range(450f, 750f));
+                float r = Random.Range(tunnel.Radius + 8f, tunnel.Radius + 110f);
+                a.transform.position = new Vector3(dir.x * r, dir.y * r, pz + Random.Range(260f, 600f));
             }
         }
     }
@@ -355,13 +369,20 @@ public class Game3D : MonoBehaviour
     // Враги вылетают из красных врат в дальнем конце туннеля.
     Vector3 EnemySpawnPoint()
     {
-        if (Tunnel3D.Instance != null)
+        Transform p = _player != null ? _player.transform : null;
+        if (Tunnel3D.Instance != null && p != null)
         {
-            Vector2 disc = Random.insideUnitCircle * Tunnel3D.Instance.Radius * 0.8f;
-            return Tunnel3D.Instance.GatePosition + new Vector3(disc.x, disc.y, Random.Range(0f, 20f));
+            // впереди по курсу игрока, в поле зрения камеры, на пути спирали
+            Tunnel3D t = Tunnel3D.Instance;
+            float ahead = Random.Range(150f, 230f);
+            Vector3 front = p.position + p.forward * ahead;
+            front += p.right * Random.Range(-45f, 45f) + p.up * Random.Range(-25f, 25f);
+            Vector2 xy = new Vector2(front.x, front.y);
+            float maxR = t.Radius * 0.95f;
+            if (xy.magnitude > maxR) xy = xy.normalized * maxR;
+            return new Vector3(xy.x, xy.y, front.z);
         }
 
-        Transform p = _player != null ? _player.transform : null;
         Vector3 center = p != null ? p.position : Vector3.zero;
         Vector3 fwd = p != null ? p.forward : Vector3.forward;
         Vector3 dir = Quaternion.Euler(Random.Range(-35f, 35f), Random.Range(-70f, 70f), 0f) * fwd;
@@ -377,11 +398,13 @@ public class Game3D : MonoBehaviour
     {
         GameObject go = new GameObject("Boss");
         Boss3D boss = go.AddComponent<Boss3D>();
-        if (Tunnel3D.Instance != null)
+        if (Tunnel3D.Instance != null && _player != null)
         {
-            // выходит из врат и занимает центр туннеля
-            go.transform.position = Tunnel3D.Instance.GatePosition + Vector3.forward * 30f;
-            boss.StopPosition = new Vector3(0f, 0f, (Tunnel3D.Instance.StartZ + Tunnel3D.Instance.EndZ) * 0.5f + 40f);
+            // появляется далеко впереди по курсу и встаёт в центре пути перед игроком
+            Transform p = _player.transform;
+            float dir = p.forward.z >= 0f ? 1f : -1f;
+            go.transform.position = new Vector3(0f, 0f, p.position.z + dir * 320f);
+            boss.StopPosition = new Vector3(0f, 0f, p.position.z + dir * 130f);
         }
         else
         {
@@ -426,16 +449,15 @@ public class Game3D : MonoBehaviour
         Vector3 pos = Vector3.zero;
         if (_player != null)
         {
-            pos = _player.transform.position + _player.transform.forward * 60f + Random.insideUnitSphere * 25f;
+            Transform pt = _player.transform;
+            // прямо перед игроком, в центре экрана — пикап хорошо виден и до него легко долететь
+            pos = pt.position + pt.forward * Random.Range(55f, 85f) + pt.right * Random.Range(-14f, 14f) + pt.up * Random.Range(-9f, 9f);
         }
         if (Tunnel3D.Instance != null)
         {
-            // пикапы появляются впереди игрока, внутри или рядом с туннелем
+            // только не за пределами арены
             bool clamped;
             pos = Tunnel3D.Instance.ClampToArena(pos, out clamped);
-            Vector2 r = new Vector2(pos.x, pos.y);
-            if (r.magnitude > Tunnel3D.Instance.Radius * 1.5f) r = r.normalized * Tunnel3D.Instance.Radius * 1.5f;
-            pos = new Vector3(r.x, r.y, pos.z);
         }
         else if (pos.magnitude > 160f) pos = pos.normalized * 160f;
         Pickup3D.Spawn(chosen, pos);

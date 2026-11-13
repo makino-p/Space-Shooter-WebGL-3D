@@ -10,6 +10,7 @@ public class Projectile3D : MonoBehaviour
     public bool Homing;
 
     private float _speed;
+    private Color _color = Color.white;
     private float _lifetime;
     private float _radius;
     private int _damage = 1;
@@ -24,12 +25,28 @@ public class Projectile3D : MonoBehaviour
         go.transform.position = position;
         go.transform.rotation = Quaternion.LookRotation(direction);
 
-        // светящийся "болт": вытянутая капсула + ореол
-        Factory3D.Part(PrimitiveType.Capsule, go.transform, Vector3.zero, new Vector3(0.22f, 1.1f, 0.22f) * size,
-                       Factory3D.Lit(color, 4f), new Vector3(90, 0, 0));
-        Factory3D.GlowBall(go.transform, Vector3.zero, 2.2f * size, new Color(color.r, color.g, color.b, 0.8f));
+        // лазерный болт: раскалённое белое ядро + цветной ореол + светящийся след
+        Factory3D.GlowBall(go.transform, Vector3.zero, 0.9f * size, new Color(1f, 1f, 1f, 1f));
+        Factory3D.GlowBall(go.transform, Vector3.zero, 2.4f * size, new Color(color.r, color.g, color.b, 0.85f));
+
+        TrailRenderer trail = go.AddComponent<TrailRenderer>();
+        trail.sharedMaterial = Factory3D.GlowFlat(Color.white);
+        trail.time = Mathf.Clamp(7f / Mathf.Max(speed, 1f), 0.04f, 0.14f); // длина следа ~7 м
+        trail.minVertexDistance = 0.4f;
+        trail.startWidth = 0.55f * size;
+        trail.endWidth = 0f;
+        trail.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        trail.receiveShadows = false;
+        Gradient g = new Gradient();
+        g.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(color, 0.25f), new GradientColorKey(color, 1f) },
+                  new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0.8f, 0.3f), new GradientAlphaKey(0f, 1f) });
+        trail.colorGradient = g;
+
+        // вспышка у дула (свет — только у игрока, чтобы не перегружать сцену)
+        Effects3D.MuzzleFlash(position, direction.normalized, color, faction == Faction3D.Player);
 
         Projectile3D p = go.AddComponent<Projectile3D>();
+        p._color = color;
         p.Faction = faction;
         p._speed = speed;
         p.Velocity = direction.normalized * speed;
@@ -109,6 +126,7 @@ public class Projectile3D : MonoBehaviour
         {
             if (hit.OnHit(Faction, _damage))
             {
+                Effects3D.ImpactSparks(transform.position, -Velocity.normalized, _color);
                 Destroy(gameObject);
                 return;
             }

@@ -42,10 +42,11 @@ public static class Setup3DScene
             {
                 Build();
             }
-            else if (modelsMissing || SceneNeedsAssets() || ThirdPartyAssets3D.NeedsSetup())
+            else if (modelsMissing || SceneNeedsAssets() || ThirdPartyAssets3D.NeedsSetup() || ImportedShips3D.NeedsSetup())
             {
                 if (modelsMissing) BuildSpriteModels();
                 ThirdPartyAssets3D.Setup();
+                ImportedShips3D.Setup();
                 AssignAssetsToScene();
             }
         };
@@ -57,6 +58,7 @@ public static class Setup3DScene
     {
         BuildSpriteModels();
         ThirdPartyAssets3D.Setup();
+        ImportedShips3D.Setup();
 
         Scene active = SceneManager.GetActiveScene();
         bool activeIsUntitled = !active.IsValid() || string.IsNullOrEmpty(active.path);
@@ -138,7 +140,8 @@ public static class Setup3DScene
         int ri = yaml.IndexOf("RockMaterials:");
         bool rocksAssigned = ri >= 0 && yaml.Substring(ri, System.Math.Min(60, yaml.Length - ri)).Contains("{fileID: 2100000");
         bool rocksMissing = ThirdPartyAssets3D.AvailableRocks().Count > 0 && !rocksAssigned;
-        return spriteMissing || skyMissing || rocksMissing;
+        bool smokeMissing = !yaml.Contains("SmokeMaterial: {fileID: 2100000");
+        return spriteMissing || skyMissing || rocksMissing || smokeMissing || ImportedShips3D.SceneNeedsAssets(yaml);
     }
 
     static void Assign(Game3D game)
@@ -157,6 +160,10 @@ public static class Setup3DScene
         {
             m.SetColor("_TintColor", new Color(0.5f, 0.5f, 0.5f, 0.5f));
         });
+        game.SmokeMaterial = GetOrCreateMaterial(MaterialFolder + "/Smoke3D.mat", "Legacy Shaders/Particles/Alpha Blended", m =>
+        {
+            m.SetColor("_TintColor", new Color(0.5f, 0.5f, 0.5f, 0.5f));
+        });
 
         game.PlayerShipMesh = AssetDatabase.LoadAssetAtPath<Mesh>(PlayerMeshPath);
         game.EnemyShipMesh = AssetDatabase.LoadAssetAtPath<Mesh>(EnemyMeshPath);
@@ -165,6 +172,7 @@ public static class Setup3DScene
         game.EnemyShipMaterial = AssetDatabase.LoadAssetAtPath<Material>(EnemyMatPath);
         game.AsteroidMaterial = AssetDatabase.LoadAssetAtPath<Material>(AsteroidMatPath);
         ThirdPartyAssets3D.AssignTo(game);
+        ImportedShips3D.AssignTo(game);
     }
 
     // ---------------- Модели из спрайтов ----------------

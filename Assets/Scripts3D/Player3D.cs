@@ -83,9 +83,7 @@ public class Player3D : Hittable3D
     {
         get
         {
-            return Factory3D.HasSpriteModels
-                ? new[] { new Vector3(-0.72f, 0.1f, 2.9f), new Vector3(0.72f, 0.1f, 2.9f) }
-                : new[] { new Vector3(-1.9f, -0.12f, 1.0f), new Vector3(1.9f, -0.12f, 1.0f) };
+            return Factory3D.PlayerGunPoints;
         }
     }
     private int _gunIndex;

@@ -24,7 +24,7 @@ public class Boss3D : Hittable3D
     void Start()
     {
         Faction = Faction3D.Enemy;
-        Radius = 8.5f;
+        Radius = 10f;
         _health = MaxHealth;
         _model = Factory3D.BuildBoss(transform).transform;
         _baseScale = _model.localScale;
