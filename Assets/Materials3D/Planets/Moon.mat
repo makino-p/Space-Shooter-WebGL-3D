@@ -1,0 +1,66 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Moon
+  m_Shader: {fileID: 4800000, guid: 19ee05bcbfd9a0b45bcc725b6825843e, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _CloudTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MainTex:
+        m_Texture: {fileID: 2800000, guid: 00daae639b3b2d64a961aa5028c284c1, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _NightTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _NormalMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SpecMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _Ambient: 0.025
+    - _AtmoPower: 3.5
+    - _AtmoStrength: 0
+    - _Brightness: 1.05
+    - _CloudOpacity: 0.9
+    - _CloudSpeed: 0.004
+    - _HasClouds: 0
+    - _HasNight: 0
+    - _HasNormal: 0
+    - _HasSpec: 0
+    - _NightBoost: 1.6
+    - _NormalStrength: 1
+    - _Shininess: 60
+    m_Colors:
+    - _AtmoColor: {r: 0.35, g: 0.6, b: 1, a: 1}
+    - _SpecColor: {r: 1, g: 0.95, b: 0.85, a: 1}
+    - _SunsetColor: {r: 1, g: 0.45, b: 0.2, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

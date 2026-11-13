@@ -57,6 +57,11 @@ public class UI3D : MonoBehaviour
 
         BuildThrusterBar(root);
         BuildThrottleBar(root);
+
+        // благодарности авторам ассетов (CC BY 4.0 требует указать авторство)
+        Text credits = MakeText(root, "Credits", new Vector2(1f, 0f), new Vector2(-12f, 8f), 11, TextAnchor.LowerRight);
+        credits.text = "Planet textures: Solar System Scope (CC BY 4.0)  |  Star map: NASA/GSFC SVS  |  Rocks: Poly Haven (CC0)";
+        credits.color = new Color(1f, 1f, 1f, 0.45f);
         BuildCrosshair(root);
     }
 

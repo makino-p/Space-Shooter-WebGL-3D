@@ -189,6 +189,13 @@ MonoBehaviour:
   MaxTransports: 28
   TransportMinSpeed: 55
   TransportMaxSpeed: 95
+  EarthMaterial: {fileID: 2100000, guid: ee0685487fef8a446b05440bbd54d5cd, type: 2}
+  JupiterMaterial: {fileID: 2100000, guid: 9fa855ef21ed62642bcfc0687a68ae0a, type: 2}
+  SaturnMaterial: {fileID: 2100000, guid: 06b0d9037470c8047b6c3f6548251572, type: 2}
+  SaturnRingMaterial: {fileID: 2100000, guid: 8e5db60a72cf77b4496210e631b71ba2, type: 2}
+  MarsMaterial: {fileID: 2100000, guid: 5ddc7b94c1fb9374cbbc99ead2360e2d, type: 2}
+  MoonMaterial: {fileID: 2100000, guid: 71f98061e44d3434b9a9ecb385cb52a9, type: 2}
+  SunTexture: {fileID: 2800000, guid: b1eba4914c14a0a46aa8840fa8d97eba, type: 3}
   SkyboxMaterial: {fileID: 2100000, guid: ecf4edcc79e8166488b172a1d1f22135, type: 2}
   RockMeshes:
   - {fileID: -6515374482523227709, guid: 9519725690d62e74aa1f711030ba4cca, type: 3}
@@ -212,6 +219,7 @@ MonoBehaviour:
   WeightHealth: 5
   WeightRadial: 4
   WeightHoming: 4
+  WeightColoredRounds: 7
   MinPickupDelay: 5
   MaxPickupDelay: 8
   WaveStartAfterMoving: 5
