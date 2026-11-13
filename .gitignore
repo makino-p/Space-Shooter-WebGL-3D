@@ -105,3 +105,7 @@ InitTestScene*.unity*
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
 [Ll]ibrary/
+
+# NASA Deep Star Map 8K (137 MB) is larger than GitHub file limit (100 MB).
+# Download: https://svs.gsfc.nasa.gov/4851 -> milkyway_2020_8k.exr into Assets/ThirdParty/NASA/
+/Assets/ThirdParty/NASA/milkyway_2020_8k.exr

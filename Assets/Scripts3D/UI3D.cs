@@ -16,6 +16,9 @@ public class UI3D : MonoBehaviour
     private GameObject _bossBar;
     private RectTransform _bossFill;
     private RectTransform _crosshair;
+    private bool _crosshairPlaced;
+    private RectTransform _throttleFill;
+    private Text _throttleLabel;
     private Coroutine _messageRoutine, _ammoRoutine;
 
     private readonly List<Image> _markers = new List<Image>();
@@ -53,6 +56,7 @@ public class UI3D : MonoBehaviour
         _message.gameObject.SetActive(false);
 
         BuildThrusterBar(root);
+        BuildThrottleBar(root);
         BuildCrosshair(root);
     }
 
@@ -104,6 +108,35 @@ public class UI3D : MonoBehaviour
 
         _thrusterLabel = MakeText(r, "Label", new Vector2(0f, 1f), new Vector2(0f, 22f), 15, TextAnchor.LowerLeft);
         _thrusterLabel.text = "THRUSTER [SHIFT]";
+    }
+
+    // Вертикальный индикатор рычага газа слева внизу (над полоской двигателей).
+    void BuildThrottleBar(Transform root)
+    {
+        Image bg = MakeImage(root, "Throttle_Bar", new Color(0f, 0f, 0f, 0.6f));
+        RectTransform r = bg.rectTransform;
+        r.anchorMin = r.anchorMax = r.pivot = Vector2.zero;
+        r.anchoredPosition = new Vector2(20f, 80f);
+        r.sizeDelta = new Vector2(22f, 150f);
+
+        Image fill = MakeImage(r, "Fill", new Color(0.4f, 1f, 0.5f));
+        _throttleFill = fill.rectTransform;
+        _throttleFill.anchorMin = Vector2.zero;
+        _throttleFill.anchorMax = new Vector2(1f, 0f);
+        _throttleFill.offsetMin = new Vector2(2f, 2f);
+        _throttleFill.offsetMax = new Vector2(-2f, -2f);
+
+        _throttleLabel = MakeText(r, "Label", new Vector2(0f, 0f), new Vector2(32f, 0f), 15, TextAnchor.LowerLeft);
+    }
+
+    public void UpdateThrottle(float throttle01, float speed)
+    {
+        if (_throttleFill == null) return;
+        throttle01 = Mathf.Clamp01(throttle01);
+        _throttleFill.anchorMax = new Vector2(1f, throttle01);
+        _throttleLabel.text = "THROTTLE " + Mathf.RoundToInt(throttle01 * 100f) + "%\nSPEED " + Mathf.RoundToInt(speed) +
+                              (throttle01 <= 0.001f && speed < 0.5f ? "\n<color=#ffcc55>W - go</color>" : "");
+        _throttleLabel.supportRichText = true;
     }
 
     void BuildCrosshair(Transform root)
@@ -197,8 +230,9 @@ public class UI3D : MonoBehaviour
 
     public void ShowControlsHint()
     {
-        _hint.text = "MOUSE / ARROWS - steer    W/S - throttle    A/D - strafe    Q/E - down/up\n" +
-                     "SPACE / LMB - fire    SHIFT - boost    C - pull pickups    click to capture mouse, ESC to release";
+        _hint.text = "MOUSE / ARROWS - steer    W/S - throttle up/down    X - full stop    A/D - strafe    Q/E - down/up\n" +
+                     "SPACE / LMB - fire    SHIFT - boost    C - pull pickups    click to capture mouse, ESC to release\n" +
+                     "Fly through the neon tunnel - enemies come from the red ENEMY GATE";
         StartCoroutine(HideAfter(_hint.gameObject, 14f));
     }
 
@@ -266,7 +300,18 @@ public class UI3D : MonoBehaviour
         {
             Vector3 sp = cam.WorldToScreenPoint(player.AimPoint);
             _crosshair.gameObject.SetActive(sp.z > 0f);
-            _crosshair.position = new Vector3(sp.x, sp.y, 0f);
+            // прицел плавно догоняет точку наведения
+            Vector3 target = new Vector3(sp.x, sp.y, 0f);
+            if (!_crosshairPlaced)
+            {
+                _crosshair.position = target;
+                _crosshairPlaced = true;
+            }
+            else
+            {
+                float k = 1f - Mathf.Exp(-14f * Time.deltaTime);
+                _crosshair.position = Vector3.Lerp(_crosshair.position, target, k);
+            }
         }
 
         UpdateMarkers(cam);

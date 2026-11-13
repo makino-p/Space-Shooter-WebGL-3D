@@ -3,21 +3,26 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // Корабль игрока: свободный полёт в 3D.
-// Мышь / стрелки — поворот, W/S — газ, A/D — стрейф, Q/E — вниз/вверх,
-// Left Shift — ускорение (тратит заряд двигателей), Space / ЛКМ — огонь, C — притянуть пикапы.
+// Мышь / стрелки — поворот, W/S — рычаг газа (вверх/вниз), X — полная остановка,
+// A/D — стрейф, Q/E — вниз/вверх, Left Shift — форсаж (тратит заряд двигателей),
+// Space / ЛКМ — огонь, C — притянуть пикапы.
 public class Player3D : Hittable3D
 {
     public static Player3D Instance;
 
-    [Header("Flight")]
-    public float CruiseSpeed = 22f;
-    public float MaxSpeed = 36f;
-    public float MinSpeed = 6f;
-    public float Acceleration = 20f;
+    [Header("Flight (ручной газ)")]
+    public float MaxSpeed = 38f;          // скорость при 100% газа
+    public float ThrottleRate = 0.6f;     // как быстро W/S двигают рычаг газа (доля в секунду)
+    public float Acceleration = 16f;      // разгон до скорости рычага
+    public float Deceleration = 24f;      // торможение
     public float StrafeSpeed = 14f;
-    public float MouseSensitivity = 2.2f;
-    public float KeyTurnSpeed = 90f;
-    public float ArenaRadius = 170f;
+    public float StrafeResponse = 4f;     // плавность стрейфа
+
+    [Header("Steering (плавность)")]
+    public float MouseSensitivity = 1.6f;
+    public float KeyTurnSpeed = 70f;
+    public float RotationSmoothTime = 0.14f; // больше — плавнее и "тяжелее"
+    public float ArenaRadius = 170f;         // используется, если нет туннеля
 
     [Header("Thrusters (Left Shift)")]
     public float BoostMultiplier = 1.8f;
@@ -44,6 +49,7 @@ public class Player3D : Hittable3D
     public bool ThrusterOverheated { get { return _overheated; } }
     public bool IsBoosting { get { return _boosting; } }
     public float CurrentSpeed { get { return _speed; } }
+    public float Throttle01 { get { return _throttle; } }
     public Vector3 Velocity { get; private set; }
 
     private bool _alive = true;
@@ -89,7 +95,8 @@ public class Player3D : Hittable3D
         Lives = MaxLives;
         Ammo = MaxAmmo;
         _thruster = MaxThrusterCharge;
-        _speed = CruiseSpeed;
+        _speed = 0f;      // старт: корабль стоит на месте
+        _throttle = 0f;
 
         _model = Factory3D.BuildPlayerShip(transform).transform;
         Vector3[] engines = Factory3D.PlayerEnginePoints;
@@ -140,25 +147,43 @@ public class Player3D : Hittable3D
     }
 
     float _yawInput;
+    float _targetYaw, _targetPitch;
+    float _yawVelocity, _pitchVelocity;
+    bool _rotationInitialized;
 
+    // Ввод двигает "целевое" направление, а корабль плавно догоняет его (SmoothDamp) —
+    // поэтому поворот и прицел движутся мягко, без рывков.
     void HandleRotation()
     {
-        float yawDelta = 0f, pitchDelta = 0f;
+        if (!_rotationInitialized)
+        {
+            _targetYaw = _yaw;
+            _targetPitch = _pitch;
+            _rotationInitialized = true;
+        }
+
         if (Cursor.lockState == CursorLockMode.Locked)
         {
-            yawDelta += Input.GetAxis("Mouse X") * MouseSensitivity;
-            pitchDelta -= Input.GetAxis("Mouse Y") * MouseSensitivity;
+            // ограничение резких скачков мыши (особенно в WebGL)
+            float mx = Mathf.Clamp(Input.GetAxis("Mouse X"), -8f, 8f);
+            float my = Mathf.Clamp(Input.GetAxis("Mouse Y"), -8f, 8f);
+            _targetYaw += mx * MouseSensitivity;
+            _targetPitch -= my * MouseSensitivity;
         }
         float keyYaw = (Input.GetKey(KeyCode.RightArrow) ? 1f : 0f) - (Input.GetKey(KeyCode.LeftArrow) ? 1f : 0f);
         float keyPitch = (Input.GetKey(KeyCode.DownArrow) ? 1f : 0f) - (Input.GetKey(KeyCode.UpArrow) ? 1f : 0f);
-        yawDelta += keyYaw * KeyTurnSpeed * Time.deltaTime;
-        pitchDelta += keyPitch * KeyTurnSpeed * Time.deltaTime;
+        _targetYaw += keyYaw * KeyTurnSpeed * Time.deltaTime;
+        _targetPitch += keyPitch * KeyTurnSpeed * Time.deltaTime;
+        _targetPitch = Mathf.Clamp(_targetPitch, -75f, 75f);
 
-        _yaw += yawDelta;
-        _pitch = Mathf.Clamp(_pitch + pitchDelta, -75f, 75f);
+        // не даём цели убегать слишком далеко вперёд от корабля
+        _targetYaw = _yaw + Mathf.Clamp(Mathf.DeltaAngle(_yaw, _targetYaw), -60f, 60f);
+
+        _yaw = Mathf.SmoothDampAngle(_yaw, _targetYaw, ref _yawVelocity, RotationSmoothTime);
+        _pitch = Mathf.SmoothDampAngle(_pitch, _targetPitch, ref _pitchVelocity, RotationSmoothTime);
         transform.rotation = Quaternion.Euler(_pitch, _yaw, 0f);
 
-        _yawInput = Mathf.Lerp(_yawInput, Mathf.Clamp(yawDelta / Mathf.Max(Time.deltaTime, 0.001f) / 120f, -1f, 1f), Time.deltaTime * 6f);
+        _yawInput = Mathf.Clamp(_yawVelocity / 120f, -1f, 1f);
     }
 
     void HandleThrusters()
@@ -185,30 +210,48 @@ public class Player3D : Hittable3D
     }
 
     float _strafeInput;
+    float _verticalInput;
+    float _throttle; // 0..1, при старте 0 — корабль стоит на месте
 
     void HandleMovement()
     {
-        float target = CruiseSpeed;
-        if (Input.GetKey(KeyCode.W)) target = MaxSpeed;
-        if (Input.GetKey(KeyCode.S)) target = MinSpeed;
-        _speed = Mathf.MoveTowards(_speed, target, Acceleration * Time.deltaTime);
+        // рычаг газа: W прибавляет, S убавляет, X — полный стоп. Без нажатий газ остаётся как есть.
+        if (Input.GetKey(KeyCode.W)) _throttle += ThrottleRate * Time.deltaTime;
+        if (Input.GetKey(KeyCode.S)) _throttle -= ThrottleRate * 1.3f * Time.deltaTime;
+        if (Input.GetKeyDown(KeyCode.X)) _throttle = 0f;
+        _throttle = Mathf.Clamp01(_throttle);
+
+        // форсаж (Shift) работает как рывок вперёд даже с места
+        float target = _throttle * MaxSpeed;
+        if (_boosting) target = Mathf.Max(target, MaxSpeed * 0.6f) * BoostMultiplier;
+        float rate = target > _speed ? Acceleration * (_boosting ? 2f : 1f) : Deceleration;
+        _speed = Mathf.MoveTowards(_speed, target, rate * Time.deltaTime);
 
         float strafe = (Input.GetKey(KeyCode.D) ? 1f : 0f) - (Input.GetKey(KeyCode.A) ? 1f : 0f);
         float vertical = (Input.GetKey(KeyCode.E) ? 1f : 0f) - (Input.GetKey(KeyCode.Q) ? 1f : 0f);
-        _strafeInput = Mathf.Lerp(_strafeInput, strafe, Time.deltaTime * 6f);
+        _strafeInput = Mathf.MoveTowards(_strafeInput, strafe, StrafeResponse * Time.deltaTime);
+        _verticalInput = Mathf.MoveTowards(_verticalInput, vertical, StrafeResponse * Time.deltaTime);
 
-        float mult = _speedMultiplier * (_boosting ? BoostMultiplier : 1f);
-        Vector3 v = transform.forward * _speed * mult
-                  + transform.right * strafe * StrafeSpeed * _speedMultiplier
-                  + transform.up * vertical * StrafeSpeed * _speedMultiplier;
+        Vector3 v = transform.forward * _speed * _speedMultiplier
+                  + transform.right * _strafeInput * StrafeSpeed * _speedMultiplier
+                  + transform.up * _verticalInput * StrafeSpeed * _speedMultiplier;
         Velocity = v;
         Vector3 pos = transform.position + v * Time.deltaTime;
 
-        // граница арены
-        if (pos.magnitude > ArenaRadius)
+        // граница арены: вокруг туннеля (из него можно вылетать, но не слишком далеко)
+        bool clamped;
+        if (Tunnel3D.Instance != null)
         {
-            pos = pos.normalized * ArenaRadius;
-            if (Game3D.Instance != null) Game3D.Instance.UI.ShowMessage("RETURN TO THE ARENA", 0.6f, new Color(1f, 0.8f, 0.3f));
+            pos = Tunnel3D.Instance.ClampToArena(pos, out clamped);
+        }
+        else
+        {
+            clamped = pos.magnitude > ArenaRadius;
+            if (clamped) pos = pos.normalized * ArenaRadius;
+        }
+        if (clamped && Game3D.Instance != null)
+        {
+            Game3D.Instance.UI.ShowMessage("RETURN TO THE TUNNEL", 0.6f, new Color(1f, 0.8f, 0.3f));
         }
         transform.position = pos;
     }
@@ -308,6 +351,7 @@ public class Player3D : Hittable3D
         if (Game3D.Instance != null)
         {
             Game3D.Instance.UI.UpdateThruster(ThrusterCharge01, _overheated);
+            Game3D.Instance.UI.UpdateThrottle(_throttle, _speed * _speedMultiplier);
         }
     }
 

@@ -162,6 +162,17 @@ MonoBehaviour:
   PlayerShipMaterial: {fileID: 2100000, guid: 5837dc331af0e0241bbace87ea4006b2, type: 2}
   EnemyShipMaterial: {fileID: 2100000, guid: 3962e6331caa9d64180ebd88e27431e2, type: 2}
   AsteroidMaterial: {fileID: 2100000, guid: e5494f38b4a292e42826ac1eb12f4dd5, type: 2}
+  SkyboxMaterial: {fileID: 2100000, guid: ecf4edcc79e8166488b172a1d1f22135, type: 2}
+  RockMeshes:
+  - {fileID: -6515374482523227709, guid: 9519725690d62e74aa1f711030ba4cca, type: 3}
+  - {fileID: 8902592029813573618, guid: c07e8b6afad7f1f45b80aefff1d9fffe, type: 3}
+  - {fileID: -8605218278736231190, guid: 22f48ec96acbf8f4f9b09ae52bad35a5, type: 3}
+  - {fileID: -1695755305941879930, guid: 5101b97d470a0f541ab0b26a20c5a6b1, type: 3}
+  RockMaterials:
+  - {fileID: 2100000, guid: 94fad402b017482439732b33318b4ed3, type: 2}
+  - {fileID: 2100000, guid: edcdda33e5006534f82b1dfd8b051018, type: 2}
+  - {fileID: 2100000, guid: 92e06f0d9be00e54b9a5f7aadc113b28, type: 2}
+  - {fileID: 2100000, guid: fcb3e2ad623145145b934174f1579f00, type: 2}
   TotalWaves: 5
   BaseEnemiesPerWave: 4
   ExtraEnemiesPerWave: 3

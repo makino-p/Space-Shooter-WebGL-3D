@@ -25,6 +25,11 @@ public class Game3D : MonoBehaviour
     public Material EnemyShipMaterial;
     public Material AsteroidMaterial;
 
+    [Header("Downloaded assets (NASA sky, Poly Haven rocks)")]
+    public Material SkyboxMaterial;
+    public Mesh[] RockMeshes;
+    public Material[] RockMaterials;
+
     [Header("Waves")]
     public int TotalWaves = 5;          // последняя волна заканчивается боссом
     public int BaseEnemiesPerWave = 4;
@@ -62,25 +67,28 @@ public class Game3D : MonoBehaviour
         Factory3D.LitBase = LitMaterial;
         Factory3D.GlowBase = GlowMaterial;
         Factory3D.SetSpriteModels(PlayerShipMesh, PlayerShipMaterial, EnemyShipMesh, EnemyShipMaterial, AsteroidMesh, AsteroidMaterial);
+        Factory3D.SetRockModels(RockMeshes, RockMaterials);
         Hittable3D.All.Clear();
         Projectile3D.Active.Clear();
         Pickup3D.Pickups.Clear();
 
         BuildEnvironment();
         BuildAudio();
+        Tunnel3D tunnel = Tunnel3D.Create();
 
         UI = gameObject.AddComponent<UI3D>();
 
+        // игрок стоит у входа в туннель, носом к вратам врагов
         GameObject playerGo = new GameObject("Player");
-        playerGo.transform.position = new Vector3(0f, 0f, -90f);
+        playerGo.transform.position = new Vector3(0f, 0f, tunnel.StartZ + 30f);
         playerGo.transform.rotation = Quaternion.identity;
         _player = playerGo.AddComponent<Player3D>();
 
         CameraRig.SetTarget(playerGo.transform);
 
         // стартовый астероид прямо по курсу — уничтожь его, чтобы начать
-        Asteroid3D.Spawn(new Vector3(0f, 0f, -50f), 6f, true);
-        SpawnAsteroidField(28);
+        Asteroid3D.Spawn(new Vector3(0f, 0f, tunnel.StartZ + 75f), 6f, true);
+        SpawnAsteroidField(45);
     }
 
     void Start()
@@ -128,7 +136,18 @@ public class Game3D : MonoBehaviour
         f.shadows = LightShadows.None;
         fill.transform.rotation = Quaternion.Euler(-30f, 140f, 0f);
 
-        Factory3D.Starfield(1800, 600f, 900f);
+        // настоящее звёздное небо NASA, если ассет скачан
+        if (SkyboxMaterial != null)
+        {
+            RenderSettings.skybox = SkyboxMaterial;
+            cam.clearFlags = CameraClearFlags.Skybox;
+            // немного близких звёзд-частиц для ощущения движения
+            Factory3D.Starfield(500, 250f, 500f);
+        }
+        else
+        {
+            Factory3D.Starfield(1800, 600f, 900f);
+        }
 
         // далёкая планета и туманности для ориентации в пространстве
         GameObject planetRoot = new GameObject("Planet");
@@ -137,9 +156,12 @@ public class Game3D : MonoBehaviour
                        Factory3D.Lit(new Color(0.25f, 0.4f, 0.75f), 0.05f, 0f, 0.2f));
         Factory3D.GlowBall(planetRoot.transform, Vector3.zero, 420f, new Color(0.2f, 0.4f, 1f, 0.35f));
 
-        Factory3D.GlowBall(null, new Vector3(500f, 200f, -300f), 700f, new Color(0.6f, 0.15f, 0.5f, 0.25f));
-        Factory3D.GlowBall(null, new Vector3(-200f, 400f, -500f), 600f, new Color(0.15f, 0.35f, 0.6f, 0.2f));
-        Factory3D.GlowBall(null, new Vector3(300f, -350f, 400f), 500f, new Color(0.7f, 0.35f, 0.1f, 0.18f));
+        if (SkyboxMaterial == null)
+        {
+            Factory3D.GlowBall(null, new Vector3(500f, 200f, -300f), 700f, new Color(0.6f, 0.15f, 0.5f, 0.25f));
+            Factory3D.GlowBall(null, new Vector3(-200f, 400f, -500f), 600f, new Color(0.15f, 0.35f, 0.6f, 0.2f));
+            Factory3D.GlowBall(null, new Vector3(300f, -350f, 400f), 500f, new Color(0.7f, 0.35f, 0.1f, 0.18f));
+        }
     }
 
     void SpawnAsteroidField(int count)
@@ -148,14 +170,26 @@ public class Game3D : MonoBehaviour
         {
             Vector3 pos;
             int guard = 0;
+            Tunnel3D tunnel = Tunnel3D.Instance;
             do
             {
-                pos = Random.insideUnitSphere * 160f;
+                if (tunnel != null)
+                {
+                    // пояс астероидов вокруг туннеля, внутри туннеля чисто
+                    float z = Random.Range(tunnel.StartZ, tunnel.EndZ);
+                    Vector2 dir = Random.insideUnitCircle.normalized;
+                    float r = Random.Range(tunnel.Radius + 12f, tunnel.Radius + 140f);
+                    pos = new Vector3(dir.x * r, dir.y * r, z);
+                }
+                else
+                {
+                    pos = Random.insideUnitSphere * 160f;
+                }
                 guard++;
             }
             // не ставить на линию старта
-            while (guard < 20 && (pos.magnitude < 30f || (Mathf.Abs(pos.x) < 15f && Mathf.Abs(pos.y) < 15f && pos.z < -20f)));
-            Asteroid3D.Spawn(pos, Random.Range(3f, 9f), false);
+            while (guard < 20 && tunnel == null && (pos.magnitude < 30f || (Mathf.Abs(pos.x) < 15f && Mathf.Abs(pos.y) < 15f && pos.z < -20f)));
+            Asteroid3D.Spawn(pos, Random.Range(3f, 11f), false);
         }
     }
 
@@ -291,9 +325,15 @@ public class Game3D : MonoBehaviour
         return pool[Random.Range(0, pool.Count)];
     }
 
-    // Враги появляются впереди игрока (в конусе ~70°), чтобы их было видно.
+    // Враги вылетают из красных врат в дальнем конце туннеля.
     Vector3 EnemySpawnPoint()
     {
+        if (Tunnel3D.Instance != null)
+        {
+            Vector2 disc = Random.insideUnitCircle * Tunnel3D.Instance.Radius * 0.8f;
+            return Tunnel3D.Instance.GatePosition + new Vector3(disc.x, disc.y, Random.Range(0f, 20f));
+        }
+
         Transform p = _player != null ? _player.transform : null;
         Vector3 center = p != null ? p.position : Vector3.zero;
         Vector3 fwd = p != null ? p.forward : Vector3.forward;
@@ -308,12 +348,21 @@ public class Game3D : MonoBehaviour
 
     void SpawnBoss()
     {
-        Vector3 away = _player != null ? -_player.transform.position.normalized : Vector3.forward;
-        if (away.sqrMagnitude < 0.01f) away = Vector3.forward;
         GameObject go = new GameObject("Boss");
-        go.transform.position = away * 170f;
         Boss3D boss = go.AddComponent<Boss3D>();
-        boss.StopPosition = Vector3.zero;
+        if (Tunnel3D.Instance != null)
+        {
+            // выходит из врат и занимает центр туннеля
+            go.transform.position = Tunnel3D.Instance.GatePosition + Vector3.forward * 30f;
+            boss.StopPosition = new Vector3(0f, 0f, (Tunnel3D.Instance.StartZ + Tunnel3D.Instance.EndZ) * 0.5f + 40f);
+        }
+        else
+        {
+            Vector3 away = _player != null ? -_player.transform.position.normalized : Vector3.forward;
+            if (away.sqrMagnitude < 0.01f) away = Vector3.forward;
+            go.transform.position = away * 170f;
+            boss.StopPosition = Vector3.zero;
+        }
     }
 
     // ---------------- Пикапы ----------------
@@ -352,7 +401,16 @@ public class Game3D : MonoBehaviour
         {
             pos = _player.transform.position + _player.transform.forward * 60f + Random.insideUnitSphere * 25f;
         }
-        if (pos.magnitude > 160f) pos = pos.normalized * 160f;
+        if (Tunnel3D.Instance != null)
+        {
+            // пикапы появляются впереди игрока, внутри или рядом с туннелем
+            bool clamped;
+            pos = Tunnel3D.Instance.ClampToArena(pos, out clamped);
+            Vector2 r = new Vector2(pos.x, pos.y);
+            if (r.magnitude > Tunnel3D.Instance.Radius * 1.5f) r = r.normalized * Tunnel3D.Instance.Radius * 1.5f;
+            pos = new Vector3(r.x, r.y, pos.z);
+        }
+        else if (pos.magnitude > 160f) pos = pos.normalized * 160f;
         Pickup3D.Spawn(chosen, pos);
     }
 }

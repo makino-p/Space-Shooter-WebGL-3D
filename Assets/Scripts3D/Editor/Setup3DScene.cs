@@ -42,9 +42,10 @@ public static class Setup3DScene
             {
                 Build();
             }
-            else if (modelsMissing || SceneNeedsAssets())
+            else if (modelsMissing || SceneNeedsAssets() || ThirdPartyAssets3D.NeedsSetup())
             {
-                BuildSpriteModels();
+                if (modelsMissing) BuildSpriteModels();
+                ThirdPartyAssets3D.Setup();
                 AssignAssetsToScene();
             }
         };
@@ -55,6 +56,7 @@ public static class Setup3DScene
     public static void Build()
     {
         BuildSpriteModels();
+        ThirdPartyAssets3D.Setup();
 
         Scene active = SceneManager.GetActiveScene();
         bool activeIsUntitled = !active.IsValid() || string.IsNullOrEmpty(active.path);
@@ -131,7 +133,12 @@ public static class Setup3DScene
     {
         // в YAML сцены поле пустое, если меш не назначен
         string yaml = File.ReadAllText(ScenePath);
-        return !yaml.Contains("PlayerShipMesh: {fileID: 4300000") || !yaml.Contains("AsteroidMesh: {fileID: 4300000");
+        bool spriteMissing = !yaml.Contains("PlayerShipMesh: {fileID: 4300000") || !yaml.Contains("AsteroidMesh: {fileID: 4300000");
+        bool skyMissing = ThirdPartyAssets3D.HasSky && !yaml.Contains("SkyboxMaterial: {fileID: 2100000");
+        int ri = yaml.IndexOf("RockMaterials:");
+        bool rocksAssigned = ri >= 0 && yaml.Substring(ri, System.Math.Min(60, yaml.Length - ri)).Contains("{fileID: 2100000");
+        bool rocksMissing = ThirdPartyAssets3D.AvailableRocks().Count > 0 && !rocksAssigned;
+        return spriteMissing || skyMissing || rocksMissing;
     }
 
     static void Assign(Game3D game)
@@ -157,6 +164,7 @@ public static class Setup3DScene
         game.PlayerShipMaterial = AssetDatabase.LoadAssetAtPath<Material>(PlayerMatPath);
         game.EnemyShipMaterial = AssetDatabase.LoadAssetAtPath<Material>(EnemyMatPath);
         game.AsteroidMaterial = AssetDatabase.LoadAssetAtPath<Material>(AsteroidMatPath);
+        ThirdPartyAssets3D.AssignTo(game);
     }
 
     // ---------------- Модели из спрайтов ----------------

@@ -87,7 +87,7 @@ public class Enemy3D : Hittable3D
         Vector3 toPlayer = PlayerPos() - transform.position;
         Vector3 axis = Vector3.Cross(toPlayer, Random.onUnitSphere).normalized;
         if (axis.sqrMagnitude < 0.01f) axis = Vector3.up;
-        _velocity = Quaternion.AngleAxis(Random.Range(30f, 55f), axis) * toPlayer.normalized * _speed;
+        _velocity = Quaternion.AngleAxis(Random.Range(10f, 30f), axis) * toPlayer.normalized * _speed;
         transform.rotation = Quaternion.LookRotation(_velocity);
     }
 
@@ -106,6 +106,8 @@ public class Enemy3D : Hittable3D
 
         Vector3 desired;
         float speed = _speed;
+        // вдалеке от игрока (только вылетели из врат) — быстрый пролёт по туннелю
+        if (playerAlive && dist > 110f) speed *= 2.8f;
         float turn = _turnRate;
 
         // ----- агрессия: таран, если игрок близко -----
@@ -156,7 +158,7 @@ public class Enemy3D : Hittable3D
             _shieldBubble.transform.localScale = Vector3.one * (5.5f + Mathf.Sin(Time.time * 4f) * 0.2f);
         }
 
-        if (transform.position.magnitude > 300f)
+        if (Mathf.Abs(transform.position.z - 120f) > 650f || new Vector2(transform.position.x, transform.position.y).magnitude > 450f)
         {
             Destroy(gameObject);
         }

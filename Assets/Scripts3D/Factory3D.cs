@@ -417,8 +417,39 @@ public static class Factory3D
     }
 
     // ---------------- Астероид ----------------
+    // ---------------- Скачанные камни Poly Haven ----------------
+    private static Mesh[] _rockMeshes;
+    private static Material[] _rockMats;
+
+    public static void SetRockModels(Mesh[] meshes, Material[] materials)
+    {
+        _rockMeshes = meshes;
+        _rockMats = materials;
+    }
+
+    static bool HasRocks
+    {
+        get { return _rockMeshes != null && _rockMats != null && _rockMeshes.Length > 0 && _rockMeshes.Length == _rockMats.Length; }
+    }
+
     public static GameObject BuildAsteroid(Transform parent, float size)
     {
+        if (HasRocks)
+        {
+            // фотоскан камня, отмасштабированный под нужный размер и отцентрованный
+            int i = Random.Range(0, _rockMeshes.Length);
+            Mesh mesh = _rockMeshes[i];
+            Bounds b = mesh.bounds;
+            float maxDim = Mathf.Max(b.size.x, Mathf.Max(b.size.y, b.size.z));
+            float scale = maxDim > 0.0001f ? size / maxDim : 1f;
+
+            GameObject model = new GameObject("Asteroid_Model");
+            model.transform.SetParent(parent, false);
+            GameObject rock = MeshPart(mesh, _rockMats[i], model.transform, -b.center * scale, scale, Vector3.zero);
+            rock.name = "Rock_Scan";
+            return model;
+        }
+
         if (_asteroidMesh != null && _asteroidMat != null)
         {
             GameObject model = new GameObject("Asteroid_Model");

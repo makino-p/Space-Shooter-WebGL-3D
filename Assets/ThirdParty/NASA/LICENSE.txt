@@ -1,0 +1,9 @@
+Deep Star Maps 2020 (milkyway_2020_8k.exr)
+Source: NASA/Goddard Space Flight Center Scientific Visualization Studio
+https://svs.gsfc.nasa.gov/4851
+Data: Gaia DR2 (ESA/Gaia/DPAC), Hipparcos-2, Tycho-2.
+License: public domain (NASA media usage guidelines). Credit appreciated:
+"NASA/Goddard Space Flight Center Scientific Visualization Studio".
+
+Note: the 8K EXR (137 MB) is excluded from git (GitHub 100 MB file limit).
+Download it from the link above into this folder.

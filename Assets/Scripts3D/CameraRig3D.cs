@@ -4,7 +4,7 @@ using UnityEngine;
 public class CameraRig3D : MonoBehaviour
 {
     public Vector3 Offset = new Vector3(0f, 3.2f, -12f);
-    public float FollowSharpness = 8f;
+    public float FollowSharpness = 6f;
     public float BaseFov = 65f;
     public float BoostFov = 78f;
 
