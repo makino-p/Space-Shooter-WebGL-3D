@@ -227,14 +227,77 @@ public class Game3D : MonoBehaviour
             _sfx[i].playOnAwake = false;
         }
 
-        if (MusicClip != null)
+        // два источника для плавного перехода между треками
+        _musicA = gameObject.AddComponent<AudioSource>();
+        _musicB = gameObject.AddComponent<AudioSource>();
+        foreach (AudioSource s in new[] { _musicA, _musicB })
         {
-            AudioSource music = gameObject.AddComponent<AudioSource>();
-            music.clip = MusicClip;
-            music.loop = true;
-            music.volume = 0.35f;
-            music.Play();
+            s.loop = true;
+            s.playOnAwake = false;
+            s.volume = 0f;
         }
+        PlayNextTrack(0.5f);
+    }
+
+    // ---------------- Музыка: новый случайный трек на каждой волне ----------------
+    [Header("Music (саундтреки, меняются на каждой волне)")]
+    public AudioClip[] MusicTracks;
+    public float MusicVolume = 0.45f;
+    public float MusicCrossfade = 2f;
+
+    private AudioSource _musicA, _musicB;
+    private bool _musicOnA;
+    private int _currentTrack = -1;
+    private Coroutine _musicFade;
+
+    // Выбирает случайный трек, отличный от текущего, и плавно переходит на него.
+    void PlayNextTrack(float fadeTime)
+    {
+        AudioClip next = null;
+        int count = MusicTracks != null ? MusicTracks.Length : 0;
+        if (count > 0)
+        {
+            int index = Random.Range(0, count);
+            if (count > 1 && index == _currentTrack) index = (index + Random.Range(1, count)) % count;
+            _currentTrack = index;
+            next = MusicTracks[index];
+        }
+        else if (_currentTrack < 0)
+        {
+            next = MusicClip; // запасной вариант — старая фоновая музыка
+            _currentTrack = 0;
+        }
+        if (next == null || _musicA == null) return;
+
+        AudioSource from = _musicOnA ? _musicA : _musicB;
+        AudioSource to = _musicOnA ? _musicB : _musicA;
+        _musicOnA = !_musicOnA;
+
+        to.clip = next;
+        to.volume = 0f;
+        to.time = 0f;
+        to.Play();
+
+        if (_musicFade != null) StopCoroutine(_musicFade);
+        _musicFade = StartCoroutine(Crossfade(from, to, fadeTime));
+    }
+
+    IEnumerator Crossfade(AudioSource from, AudioSource to, float time)
+    {
+        float t = 0f;
+        float fromStart = from.volume;
+        while (t < time)
+        {
+            t += Time.unscaledDeltaTime;
+            float k = Mathf.Clamp01(t / Mathf.Max(time, 0.01f));
+            to.volume = MusicVolume * k;
+            from.volume = fromStart * (1f - k);
+            yield return null;
+        }
+        to.volume = MusicVolume;
+        from.volume = 0f;
+        from.Stop();
+        _musicFade = null;
     }
 
     public static void PlaySound(AudioClip clip, float volume = 1f, float pitch = 1f)
@@ -381,6 +444,7 @@ public class Game3D : MonoBehaviour
             bool isFinal = wave == TotalWaves;
             UI.SetWave(wave, TotalWaves);
             UI.ShowMessage(isFinal ? "FINAL WAVE" : "WAVE " + wave, 2.5f, Color.white);
+            PlayNextTrack(MusicCrossfade); // новая волна — новый трек
             yield return new WaitForSeconds(2f);
 
             int count = BaseEnemiesPerWave + (wave - 1) * ExtraEnemiesPerWave;
@@ -412,6 +476,7 @@ public class Game3D : MonoBehaviour
             {
                 UI.ShowMessage("WARNING: BOSS INCOMING", 3f, new Color(1f, 0.3f, 0.3f));
                 yield return new WaitForSeconds(3f);
+                PlayNextTrack(MusicCrossfade); // босс — тоже смена трека
                 SpawnBoss();
             }
             else

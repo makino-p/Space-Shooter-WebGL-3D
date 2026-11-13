@@ -116,3 +116,7 @@ InitTestScene*.unity*
 /Assets/StarSparrow.meta
 /Assets/F3_Corvette/
 /Assets/F3_Corvette.meta
+
+# Third-party soundtracks (copyrighted music, local use only)
+/Assets/Audio/Soundtracks/*
+!/Assets/Audio/Soundtracks/.keep

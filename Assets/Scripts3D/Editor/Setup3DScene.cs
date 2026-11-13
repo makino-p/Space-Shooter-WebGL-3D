@@ -141,7 +141,8 @@ public static class Setup3DScene
         bool rocksAssigned = ri >= 0 && yaml.Substring(ri, System.Math.Min(60, yaml.Length - ri)).Contains("{fileID: 2100000");
         bool rocksMissing = ThirdPartyAssets3D.AvailableRocks().Count > 0 && !rocksAssigned;
         bool smokeMissing = !yaml.Contains("SmokeMaterial: {fileID: 2100000");
-        return spriteMissing || skyMissing || rocksMissing || smokeMissing || ImportedShips3D.SceneNeedsAssets(yaml);
+        return spriteMissing || skyMissing || rocksMissing || smokeMissing || ImportedShips3D.SceneNeedsAssets(yaml)
+            || Soundtracks3D.SceneNeedsAssets(yaml);
     }
 
     static void Assign(Game3D game)
@@ -173,6 +174,7 @@ public static class Setup3DScene
         game.AsteroidMaterial = AssetDatabase.LoadAssetAtPath<Material>(AsteroidMatPath);
         ThirdPartyAssets3D.AssignTo(game);
         ImportedShips3D.AssignTo(game);
+        Soundtracks3D.AssignTo(game);
     }
 
     // ---------------- Модели из спрайтов ----------------
