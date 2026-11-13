@@ -198,6 +198,7 @@ public class Player3D : Hittable3D
     [Header("Spin (правая кнопка мыши)")]
     public float SpinFullTurnTime = 2f;   // полный оборот за 2 секунды удержания (было 5)
     public float SpinStopRate = 600f;     // как быстро гаснет вращение после отпускания (град/с²)
+    public float SpinMaxRate = 1440f;     // предел скорости вращения: 4 оборота в секунду
     private float _spinHeld;
     private float _spinRate;              // текущая скорость вращения, град/с
     private float _spinRoll;              // накопленный угол вращения модели вокруг продольной оси
@@ -208,8 +209,9 @@ public class Player3D : Hittable3D
         if (Input.GetMouseButton(1))
         {
             _spinHeld += Time.deltaTime;
-            float maxRate = 720f / T;                                  // скорость в конце первого оборота
-            _spinRate = Mathf.Min(720f * _spinHeld / (T * T), maxRate); // интеграл = 360° * (t/T)²
+            // скорость растёт всё время, пока кнопка зажата: первый оборот за SpinFullTurnTime,
+            // дальше быстрее и быстрее (ограничение только SpinMaxRate, чтобы не превратилось в мельтешение)
+            _spinRate = Mathf.Min(720f * _spinHeld / (T * T), SpinMaxRate);
         }
         else
         {
