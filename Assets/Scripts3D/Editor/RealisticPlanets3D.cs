@@ -42,8 +42,8 @@ public static class RealisticPlanets3D
         Configure("earth_daymap.jpg", false);
         Configure("earth_nightmap.jpg", false);
         Configure("earth_clouds.jpg", false, srgb: false);
-        Configure("earth_normal_map.tif", true);
-        Configure("earth_specular_map.tif", false, srgb: false);
+        Configure("earth_normal_map.jpg", true);
+        Configure("earth_specular_map.jpg", false, srgb: false);
         Configure("jupiter.jpg", false);
         Configure("saturn.jpg", false);
         Configure("saturn_ring_alpha.png", false, clampU: true);
@@ -62,8 +62,8 @@ public static class RealisticPlanets3D
         {
             SetTex(m, "_NightTex", "earth_nightmap.jpg", "_HasNight");
             SetTex(m, "_CloudTex", "earth_clouds.jpg", "_HasClouds");
-            SetTex(m, "_NormalMap", "earth_normal_map.tif", "_HasNormal");
-            SetTex(m, "_SpecMap", "earth_specular_map.tif", "_HasSpec");
+            SetTex(m, "_NormalMap", "earth_normal_map.jpg", "_HasNormal");
+            SetTex(m, "_SpecMap", "earth_specular_map.jpg", "_HasSpec");
             m.SetFloat("_NightBoost", 1.8f);
             m.SetFloat("_NormalStrength", 1.2f);
             m.SetColor("_AtmoColor", new Color(0.35f, 0.62f, 1f));

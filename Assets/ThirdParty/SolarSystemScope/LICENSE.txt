@@ -1,0 +1,8 @@
+Planet textures (Earth day/night/clouds/normal/specular, Jupiter, Saturn + rings, Mars, Moon, Sun)
+Author: Solar System Scope - https://www.solarsystemscope.com/textures/
+Obtained via Wikimedia Commons (files "Solarsystemscope_texture_8k_*"), 3840px renditions.
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+
+Attribution (please keep in credits): "Planet textures by Solar System Scope, CC BY 4.0"
+Based on NASA imagery and elevation data.
