@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0, g: 0, b: 0, a: 1}
+  m_IndirectSpecularColor: {r: 0.37311953, g: 0.38074014, b: 0.3587274, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -156,6 +156,12 @@ MonoBehaviour:
   MusicClip: {fileID: 8300000, guid: 5b17a0088dcdf924fa92da5af1e1be07, type: 3}
   LitMaterial: {fileID: 2100000, guid: f54a7d7f0e978da4ba44b529131370f6, type: 2}
   GlowMaterial: {fileID: 2100000, guid: 4153f280fbd42ff46a3ce2ad32b71601, type: 2}
+  PlayerShipMesh: {fileID: 4300000, guid: 9f77a085b161805409e87194c51e78cb, type: 2}
+  EnemyShipMesh: {fileID: 4300000, guid: 89a0946c131d20c45ad0fa5a9dd9581b, type: 2}
+  AsteroidMesh: {fileID: 4300000, guid: daab918f7ff60264689a6ec0ff000bc6, type: 2}
+  PlayerShipMaterial: {fileID: 2100000, guid: 5837dc331af0e0241bbace87ea4006b2, type: 2}
+  EnemyShipMaterial: {fileID: 2100000, guid: 3962e6331caa9d64180ebd88e27431e2, type: 2}
+  AsteroidMaterial: {fileID: 2100000, guid: e5494f38b4a292e42826ac1eb12f4dd5, type: 2}
   TotalWaves: 5
   BaseEnemiesPerWave: 4
   ExtraEnemiesPerWave: 3
