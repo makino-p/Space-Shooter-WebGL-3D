@@ -63,7 +63,7 @@ public class Enemy3D : Hittable3D
         Enemy3D e = go.AddComponent<Enemy3D>();
         e.Type = type;
         e.HasShield = shielded;
-        e.Radius = 2.6f;
+        e.Radius = 3.2f; // модель стала крупнее
         e.Faction = Faction3D.Enemy;
 
         float baseSpeed;

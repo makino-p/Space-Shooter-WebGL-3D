@@ -344,9 +344,14 @@ public static class Factory3D
             int i = (int)type % count;
             GameObject model = new GameObject("Enemy_Model");
             model.transform.SetParent(parent, false);
-            Bounds b = PlaceShipModel(_enemyPrefabs[i], model.transform, _enemyEuler, _enemyLength, _enemyMats[i]);
+            // враги на 30% крупнее базовой длины — чтобы не терялись на фоне луча и транспортников
+            Bounds b = PlaceShipModel(_enemyPrefabs[i], model.transform, _enemyEuler, _enemyLength * 1.3f, _enemyMats[i]);
             Color c = EnemyColor(type);
-            GlowBall(model.transform, new Vector3(0f, 0f, -b.extents.z * 0.95f), 1.6f, c);  // двигатель
+            GlowBall(model.transform, new Vector3(0f, 0f, -b.extents.z * 0.95f), 2.2f, c);  // двигатель
+            // красный инверсионный след — отличает врагов от белых транспортников
+            EngineTrail(model.transform, new Vector3(0f, 0f, -b.extents.z), new Color(1f, 0.15f, 0.1f, 0.9f), 1.1f);
+            // мягкий красный ореол опасности
+            GlowBall(model.transform, Vector3.zero, b.extents.z * 3.2f, new Color(1f, 0.1f, 0.05f, 0.18f));
             if (type == Enemy3DType.RearGunner)
                 GlowBall(model.transform, new Vector3(0f, b.extents.y * 0.5f, -b.extents.z), 1.2f, c); // хвостовая пушка
             if (type == Enemy3DType.Beamer)

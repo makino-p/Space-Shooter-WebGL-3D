@@ -370,12 +370,21 @@ public class Game3D : MonoBehaviour
 
             int count = BaseEnemiesPerWave + (wave - 1) * ExtraEnemiesPerWave;
             float delay = Mathf.Max(0.6f, 1.8f - 0.25f * (wave - 1));
-            for (int i = 0; i < count && !_stopSpawning; i++)
+            // враги выходят группами по 2–3 корабля — так их легче заметить
+            int spawned = 0;
+            while (spawned < count && !_stopSpawning)
             {
-                Enemy3DType type = PickEnemyType(wave);
-                bool shielded = Random.value < 0.12f * (wave - 1);
-                SpawnEnemy(type, EnemySpawnPoint(), shielded);
-                yield return new WaitForSeconds(delay);
+                int group = Mathf.Min(count - spawned, Random.Range(2, 4));
+                Vector3 basePos = EnemySpawnPoint();
+                for (int g = 0; g < group; g++)
+                {
+                    Enemy3DType type = PickEnemyType(wave);
+                    bool shielded = Random.value < 0.12f * (wave - 1);
+                    Vector3 offset = new Vector3(Random.Range(-9f, 9f), Random.Range(-9f, 9f), g * 14f);
+                    SpawnEnemy(type, basePos + offset, shielded);
+                }
+                spawned += group;
+                yield return new WaitForSeconds(delay * group);
             }
 
             while (!_stopSpawning && AliveEnemies() > 0)
@@ -414,15 +423,15 @@ public class Game3D : MonoBehaviour
         Transform p = _player != null ? _player.transform : null;
         if (Tunnel3D.Instance != null && p != null)
         {
-            // впереди по курсу игрока, в поле зрения камеры, на пути спирали
-            Tunnel3D t = Tunnel3D.Instance;
-            float ahead = Random.Range(150f, 230f);
-            Vector3 front = p.position + p.forward * ahead;
-            front += p.right * Random.Range(-45f, 45f) + p.up * Random.Range(-25f, 25f);
-            Vector2 xy = new Vector2(front.x, front.y);
-            float maxR = t.Radius * 0.95f;
-            if (xy.magnitude > maxR) xy = xy.normalized * maxR;
-            return new Vector3(xy.x, xy.y, front.z);
+            // вдоль луча впереди игрока, в своей "полосе" 24–45 м от луча —
+            // дальше, чем поток транспортников (до 13 м), и вне яркой дымки луча
+            float dirZ = p.forward.z >= -0.2f ? 1f : -1f;
+            float z = p.position.z + dirZ * Random.Range(110f, 170f);
+            // ближе к той стороне луча, где игрок, чтобы враги были в кадре
+            float playerAngle = Mathf.Atan2(p.position.y, p.position.x);
+            float angle = playerAngle + Random.Range(-1.2f, 1.2f);
+            float r = Random.Range(24f, 45f);
+            return new Vector3(Mathf.Cos(angle) * r, Mathf.Sin(angle) * r, z);
         }
 
         Vector3 center = p != null ? p.position : Vector3.zero;

@@ -183,6 +183,12 @@ MonoBehaviour:
   EnemyShipEuler: {x: 0, y: 0, z: 0}
   EnemyShipLength: 5.5
   BossShipLength: 26
+  TransportShipPrefab: {fileID: 6497822382825482034, guid: 19bc9763fa1de3a46b9e632135faf962, type: 3}
+  TransportShipMaterial: {fileID: 2100000, guid: 60867ff5776ea964f940dd00fd45ec21, type: 2}
+  TransportInterval: 0.9
+  MaxTransports: 28
+  TransportMinSpeed: 55
+  TransportMaxSpeed: 95
   SkyboxMaterial: {fileID: 2100000, guid: ecf4edcc79e8166488b172a1d1f22135, type: 2}
   RockMeshes:
   - {fileID: -6515374482523227709, guid: 9519725690d62e74aa1f711030ba4cca, type: 3}
