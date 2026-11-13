@@ -34,8 +34,9 @@ public class Player3D : Hittable3D
 
     [Header("Weapons")]
     public int MaxAmmo = 150; // в 10 раз больше, чем было
-    public float FireRate = 0.18f;
-    public float ShotSpeed = 130f;
+    public float FireRate = 0.055f;       // пулемётный темп: ~18 выстрелов в секунду
+    public float MachineGunSpread = 0.7f; // лёгкий разброс очереди (градусы)
+    public float ShotSpeed = 240f;        // быстрые пули (было 130)
     public Color BulletColor = new Color(1f, 0.12f, 0.08f); // красные пули-капсулы
     public float ShotLifetime = 7f;       // дальность ~900 — астероид можно сбить с любой видимой дистанции
     public float AimAssistRange = 90f;    // на этой дистанции пули сами доворачивают к врагу
@@ -331,8 +332,17 @@ public class Player3D : Hittable3D
         Ammo--;
         Color shotColor = BulletColor;
         Vector3 gun = transform.TransformPoint(GunPoints[_gunIndex]);
-        _gunIndex = 1 - _gunIndex;
-        Vector3 aim = AimDirection(gun);
+        _gunIndex = 1 - _gunIndex; // пушки стреляют попеременно — плотная очередь
+        // лёгкий разброс, как у пулемёта (аим-ассист вблизи всё равно доводит пули до цели)
+        Vector3 aim = Quaternion.Euler(Random.Range(-MachineGunSpread, MachineGunSpread),
+                                       Random.Range(-MachineGunSpread, MachineGunSpread), 0f) * AimDirection(gun);
+
+        // "тяжёлые" режимы стреляют реже, иначе экран зальёт снарядами
+        if (_radial) _canFire = Time.time + 0.3f;
+        else if (_homing) _canFire = Time.time + 0.14f;
+
+        // отдача: мелкая дрожь камеры на каждый выстрел
+        if (Game3D.Instance != null) Game3D.Instance.CameraRig.Shake(0.05f, 0.05f);
 
         if (_homing)
         {
@@ -370,7 +380,7 @@ public class Player3D : Hittable3D
 
         if (Game3D.Instance != null)
         {
-            Game3D.PlaySound(Game3D.Instance.LaserClip, 0.45f, Random.Range(0.95f, 1.1f));
+            Game3D.PlaySound(Game3D.Instance.LaserClip, 0.3f, Random.Range(1.05f, 1.3f)); // короткий частый "стрекот"
             Game3D.Instance.UI.UpdateAmmo(Ammo, MaxAmmo);
         }
     }

@@ -220,7 +220,7 @@ public class Game3D : MonoBehaviour
 
     void BuildAudio()
     {
-        _sfx = new AudioSource[10];
+        _sfx = new AudioSource[24];
         for (int i = 0; i < _sfx.Length; i++)
         {
             _sfx[i] = gameObject.AddComponent<AudioSource>();
