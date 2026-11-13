@@ -64,6 +64,7 @@ public class Game3D : MonoBehaviour
     public int WeightHealth = 5;     // редкий
     public int WeightRadial = 4;     // редкий
     public int WeightHoming = 4;     // редкий
+    public int WeightColoredRounds = 7; // каждый из 4 цветов пуль
     public float MinPickupDelay = 5f;
     public float MaxPickupDelay = 8f;
 
@@ -563,9 +564,11 @@ public class Game3D : MonoBehaviour
         if (_player != null && _player.Ammo == 0) ammoWeight *= 3; // без патронов Ammo выпадает чаще
 
         PickupType[] types = { PickupType.Ammo, PickupType.TripleShot, PickupType.Speed, PickupType.Shield,
-                               PickupType.Negative, PickupType.Health, PickupType.Radial, PickupType.Homing };
+                               PickupType.Negative, PickupType.Health, PickupType.Radial, PickupType.Homing,
+                               PickupType.GreenRounds, PickupType.BlueRounds, PickupType.GoldRounds, PickupType.PurpleRounds };
         int[] weights = { ammoWeight, WeightTripleShot, WeightSpeed, WeightShield,
-                          WeightNegative, WeightHealth, WeightRadial, WeightHoming };
+                          WeightNegative, WeightHealth, WeightRadial, WeightHoming,
+                          WeightColoredRounds, WeightColoredRounds, WeightColoredRounds, WeightColoredRounds };
 
         int total = 0;
         foreach (int w in weights) total += w;

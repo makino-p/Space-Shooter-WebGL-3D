@@ -316,7 +316,7 @@ public class Player3D : Hittable3D
     {
         bool fire = Input.GetKey(KeyCode.Space) || (Input.GetMouseButton(0) && Cursor.lockState == CursorLockMode.Locked);
         if (!fire || Time.time < _canFire) return;
-        _canFire = Time.time + FireRate;
+        _canFire = Time.time + FireRate * (_rounds == PickupType.GoldRounds ? 0.55f : 1f); // золотые — скорострельные
 
         if (Ammo <= 0)
         {
@@ -330,7 +330,7 @@ public class Player3D : Hittable3D
         }
 
         Ammo--;
-        Color shotColor = BulletColor;
+        Color shotColor = CurrentBulletColor;
         Vector3 gun = transform.TransformPoint(GunPoints[_gunIndex]);
         _gunIndex = 1 - _gunIndex; // пушки стреляют попеременно — плотная очередь
         // лёгкий разброс, как у пулемёта (аим-ассист вблизи всё равно доводит пули до цели)
@@ -349,7 +349,7 @@ public class Player3D : Hittable3D
             foreach (Vector3 gp in GunPoints)
             {
                 Vector3 p = transform.TransformPoint(gp);
-                Projectile3D.Spawn(Faction3D.Player, p, AimDirection(p), 70f, BulletColor, 4f, 1.3f, true);
+                Projectile3D.Spawn(Faction3D.Player, p, AimDirection(p), 70f, CurrentBulletColor, 4f, 1.3f * BulletSize, true).WithPerks(BulletDamage, BulletPierce, BulletSplash);
             }
         }
         else if (_radial)
@@ -362,7 +362,7 @@ public class Player3D : Hittable3D
                 float r = Mathf.Sqrt(1f - y * y);
                 float th = golden * i;
                 Vector3 dir = transform.TransformDirection(new Vector3(Mathf.Cos(th) * r, y, Mathf.Sin(th) * r));
-                Projectile3D.Spawn(Faction3D.Player, transform.position + dir * 2.5f, dir, 90f, BulletColor, 1.6f);
+                Projectile3D.Spawn(Faction3D.Player, transform.position + dir * 2.5f, dir, 90f, CurrentBulletColor, 1.6f, BulletSize).WithPerks(BulletDamage, BulletPierce, BulletSplash);
             }
         }
         else if (_triple)
@@ -370,12 +370,12 @@ public class Player3D : Hittable3D
             for (int i = -1; i <= 1; i++)
             {
                 Vector3 dir = Quaternion.AngleAxis(i * 4f, transform.up) * aim;
-                Projectile3D.Spawn(Faction3D.Player, transform.position + transform.forward * 2f + transform.right * i * 1.5f, dir, ShotSpeed, BulletColor, ShotLifetime).EnableAimAssist(AimAssistRange, AimAssistCone);
+                Projectile3D.Spawn(Faction3D.Player, transform.position + transform.forward * 2f + transform.right * i * 1.5f, dir, ShotSpeed, CurrentBulletColor, ShotLifetime, BulletSize).WithPerks(BulletDamage, BulletPierce, BulletSplash).EnableAimAssist(AimAssistRange, AimAssistCone);
             }
         }
         else
         {
-            Projectile3D.Spawn(Faction3D.Player, gun, aim, ShotSpeed, shotColor, ShotLifetime).EnableAimAssist(AimAssistRange, AimAssistCone);
+            Projectile3D.Spawn(Faction3D.Player, gun, aim, ShotSpeed, shotColor, ShotLifetime, BulletSize).WithPerks(BulletDamage, BulletPierce, BulletSplash).EnableAimAssist(AimAssistRange, AimAssistCone);
         }
 
         if (Game3D.Instance != null)
@@ -540,7 +540,68 @@ public class Player3D : Hittable3D
                 if (!_negative) StartCoroutine(SpeedRoutine(0.5f, 4f, true));
                 if (Game3D.Instance != null) Game3D.Instance.CameraRig.Shake(0.4f, 0.25f);
                 break;
+            case PickupType.GreenRounds:
+            case PickupType.BlueRounds:
+            case PickupType.GoldRounds:
+            case PickupType.PurpleRounds:
+                SetRounds(type);
+                if (ui != null) ui.ShowMessage(RoundsName(type) + " ROUNDS", 1.4f, Factory3D.PickupColor(type));
+                break;
         }
+    }
+
+    // ---------- Цветные пули (бонусы) ----------
+    // Действуют RoundsDuration секунд; новый бонус заменяет текущий и перезапускает таймер.
+    [Header("Colored rounds (бонусы)")]
+    public float RoundsDuration = 10f;
+    private PickupType _rounds = PickupType.Ammo; // Ammo = обычные красные пули
+    private Coroutine _roundsRoutine;
+
+    public Color CurrentBulletColor
+    {
+        get
+        {
+            switch (_rounds)
+            {
+                case PickupType.GreenRounds:
+                case PickupType.BlueRounds:
+                case PickupType.GoldRounds:
+                case PickupType.PurpleRounds:
+                    return Factory3D.PickupColor(_rounds);
+                default:
+                    return BulletColor;
+            }
+        }
+    }
+
+    int BulletDamage { get { return _rounds == PickupType.BlueRounds ? 3 : 1; } }
+    int BulletPierce { get { return _rounds == PickupType.GreenRounds ? 3 : 0; } }
+    float BulletSplash { get { return _rounds == PickupType.PurpleRounds ? 12f : 0f; } }
+    float BulletSize { get { return _rounds == PickupType.BlueRounds ? 1.5f : 1f; } }
+
+    static string RoundsName(PickupType t)
+    {
+        switch (t)
+        {
+            case PickupType.GreenRounds: return "PIERCING";
+            case PickupType.BlueRounds: return "PLASMA x3";
+            case PickupType.GoldRounds: return "RAPID";
+            default: return "BLAST";
+        }
+    }
+
+    void SetRounds(PickupType type)
+    {
+        if (_roundsRoutine != null) StopCoroutine(_roundsRoutine);
+        _roundsRoutine = StartCoroutine(RoundsRoutine(type));
+    }
+
+    IEnumerator RoundsRoutine(PickupType type)
+    {
+        _rounds = type;
+        yield return new WaitForSeconds(RoundsDuration);
+        _rounds = PickupType.Ammo;
+        _roundsRoutine = null;
     }
 
     void RestartTimer(ref Coroutine routine, IEnumerator work)

@@ -558,6 +558,10 @@ public static class Factory3D
             case PickupType.Radial: return new Color(1f, 1f, 0.85f);
             case PickupType.Negative: return new Color(1f, 0.1f, 0.1f);
             case PickupType.Homing: return new Color(1f, 0.3f, 1f);
+            case PickupType.GreenRounds: return new Color(0.2f, 1f, 0.3f);
+            case PickupType.BlueRounds: return new Color(0.2f, 0.5f, 1f);
+            case PickupType.GoldRounds: return new Color(1f, 0.78f, 0.15f);
+            case PickupType.PurpleRounds: return new Color(0.75f, 0.25f, 1f);
         }
         return Color.white;
     }
@@ -574,6 +578,10 @@ public static class Factory3D
             case PickupType.Radial: return "R";
             case PickupType.Negative: return "!";
             case PickupType.Homing: return "H";
+            case PickupType.GreenRounds: return "P";
+            case PickupType.BlueRounds: return "X3";
+            case PickupType.GoldRounds: return ">>";
+            case PickupType.PurpleRounds: return "B";
         }
         return "?";
     }

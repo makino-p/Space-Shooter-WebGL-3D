@@ -47,7 +47,72 @@ public static class Planets3D
         return root;
     }
 
-    static void AddNeonRing(Transform parent, float radius, float width, Color color, float tilt)
+    // ---------------- Звезда-источник луча (начало пути) ----------------
+    // Неподвижна в мире: раскалённая поверхность, многослойная корона, неоновые кольца,
+    // мощный свет и "основание" луча, выходящее из её поверхности.
+    public static GameObject BuildBeamSource(Vector3 position, float diameter)
+    {
+        GameObject root = new GameObject("Beam_Source_Star");
+        root.transform.position = position;
+
+        // раскалённая поверхность с гранулами плазмы
+        const int w = 512, h = 256;
+        Texture2D albedo = new Texture2D(w, h, TextureFormat.RGBA32, true);
+        Texture2D emission = new Texture2D(w, h, TextureFormat.RGBA32, true);
+        Color32[] a = new Color32[w * h];
+        Color32[] e = new Color32[w * h];
+        for (int y = 0; y < h; y++)
+        {
+            float lat = (y + 0.5f) / h * Mathf.PI - Mathf.PI / 2f;
+            for (int x = 0; x < w; x++)
+            {
+                float lon = (x + 0.5f) / w * Mathf.PI * 2f;
+                Vector3 d = new Vector3(Mathf.Cos(lat) * Mathf.Cos(lon), Mathf.Sin(lat), Mathf.Cos(lat) * Mathf.Sin(lon));
+                float granule = Fbm(d * 7f, 4);
+                float flare = Mathf.Clamp01((Fbm(d * 2.5f + Vector3.one * 5f, 3) - 0.55f) * 5f);
+                Color hot = Color.Lerp(new Color(0.35f, 0.7f, 1f), new Color(1f, 1f, 1f), granule);
+                hot = Color.Lerp(hot, new Color(0.8f, 0.5f, 1f), flare * 0.6f);
+                a[y * w + x] = hot;
+                e[y * w + x] = hot * (0.7f + granule * 0.6f);
+            }
+        }
+        albedo.SetPixels32(a); albedo.Apply(true);
+        emission.SetPixels32(e); emission.Apply(true);
+
+        Material m = Factory3D.LitBase != null ? new Material(Factory3D.LitBase) : new Material(Shader.Find("Standard"));
+        m.mainTexture = albedo;
+        m.SetFloat("_Metallic", 0f);
+        m.SetFloat("_Glossiness", 0.1f);
+        m.EnableKeyword("_EMISSION");
+        m.SetTexture("_EmissionMap", emission);
+        m.SetColor("_EmissionColor", new Color(3.2f, 3.2f, 3.2f));
+
+        GameObject body = Factory3D.Part(PrimitiveType.Sphere, root.transform, Vector3.zero, Vector3.one * diameter, m);
+        body.name = "Star_Surface";
+        body.AddComponent<Spin3D>().DegreesPerSecond = 3f;
+
+        // корона в несколько слоёв
+        Factory3D.GlowBall(root.transform, Vector3.zero, diameter * 1.35f, new Color(0.85f, 0.95f, 1f, 0.9f));
+        Factory3D.GlowBall(root.transform, Vector3.zero, diameter * 2.2f, new Color(0.3f, 0.75f, 1f, 0.55f));
+        Factory3D.GlowBall(root.transform, Vector3.zero, diameter * 3.6f, new Color(0.45f, 0.3f, 1f, 0.28f));
+
+        // неоновые кольца вокруг
+        Spin3D r1 = AddNeonRing(root.transform, diameter * 0.85f, 2.5f, new Color(0.3f, 0.9f, 1f), 0f).AddComponent<Spin3D>();
+        r1.Axis = Vector3.forward; r1.DegreesPerSecond = 8f;
+        Spin3D r2 = AddNeonRing(root.transform, diameter * 1.05f, 1.4f, new Color(0.8f, 0.4f, 1f), 30f).AddComponent<Spin3D>();
+        r2.Axis = Vector3.forward; r2.DegreesPerSecond = -5f;
+
+        // свет звезды освещает всё начало пути
+        Light l = root.AddComponent<Light>();
+        l.type = LightType.Point;
+        l.color = new Color(0.6f, 0.85f, 1f);
+        l.range = diameter * 6f;
+        l.intensity = 2.5f;
+        l.shadows = LightShadows.None;
+        return root;
+    }
+
+    static GameObject AddNeonRing(Transform parent, float radius, float width, Color color, float tilt)
     {
         GameObject go = new GameObject("Neon_Ring");
         go.transform.SetParent(parent, false);
@@ -69,6 +134,7 @@ public static class Planets3D
             float a = i * Mathf.PI * 2f / points;
             lr.SetPosition(i, new Vector3(Mathf.Cos(a) * radius, Mathf.Sin(a) * radius, 0f));
         }
+        return go;
     }
 
     // ---------------- Процедурные текстуры ----------------
@@ -211,5 +277,6 @@ public static class Planets3D
 public class Spin3D : MonoBehaviour
 {
     public float DegreesPerSecond = 2f;
-    void Update() { transform.Rotate(0f, DegreesPerSecond * Time.deltaTime, 0f, Space.Self); }
+    public Vector3 Axis = Vector3.up; // кольца крутятся в своей плоскости (Vector3.forward)
+    void Update() { transform.Rotate(Axis * DegreesPerSecond * Time.deltaTime, Space.Self); }
 }

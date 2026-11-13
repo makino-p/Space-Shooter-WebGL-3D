@@ -25,18 +25,18 @@ public class Projectile3D : MonoBehaviour
         go.transform.position = position;
         go.transform.rotation = Quaternion.LookRotation(direction);
 
-        // снаряд-капсула: светящаяся капсула вдоль полёта + раскалённая сердцевина + ореол + след
-        Factory3D.Part(PrimitiveType.Capsule, go.transform, Vector3.zero, new Vector3(0.38f, 1.25f, 0.38f) * size,
+        // снаряд: тонкая длинная светящаяся капсула + раскалённая сердцевина + небольшой ореол + длинный тонкий след
+        Factory3D.Part(PrimitiveType.Capsule, go.transform, Vector3.zero, new Vector3(0.16f, 2.8f, 0.16f) * size,
                        Factory3D.Lit(color, 6f, 0f, 0.9f), new Vector3(90f, 0f, 0f));
-        Factory3D.Part(PrimitiveType.Capsule, go.transform, Vector3.zero, new Vector3(0.16f, 1.05f, 0.16f) * size,
+        Factory3D.Part(PrimitiveType.Capsule, go.transform, Vector3.zero, new Vector3(0.07f, 2.5f, 0.07f) * size,
                        Factory3D.Lit(Color.Lerp(color, Color.white, 0.75f), 8f, 0f, 0.9f), new Vector3(90f, 0f, 0f));
-        Factory3D.GlowBall(go.transform, Vector3.zero, 2.6f * size, new Color(color.r, color.g, color.b, 0.75f));
+        Factory3D.GlowBall(go.transform, Vector3.zero, 1.5f * size, new Color(color.r, color.g, color.b, 0.7f));
 
         TrailRenderer trail = go.AddComponent<TrailRenderer>();
         trail.sharedMaterial = Factory3D.GlowFlat(Color.white);
-        trail.time = Mathf.Clamp(7f / Mathf.Max(speed, 1f), 0.04f, 0.14f); // длина следа ~7 м
+        trail.time = Mathf.Clamp(14f / Mathf.Max(speed, 1f), 0.03f, 0.2f); // длинный след ~14 м
         trail.minVertexDistance = 0.4f;
-        trail.startWidth = 0.55f * size;
+        trail.startWidth = 0.22f * size;
         trail.endWidth = 0f;
         trail.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         trail.receiveShadows = false;
@@ -124,14 +124,27 @@ public class Projectile3D : MonoBehaviour
         Vector3 from = transform.position;
         Vector3 to = from + Velocity * dt;
 
-        Hittable3D hit = Hittable3D.SegmentHit(from, to, _radius, Faction);
+        Hittable3D hit = Hittable3D.SegmentHit(from, to, _radius, Faction, _alreadyHit);
         if (hit != null)
         {
+            Vector3 hitPos = hit.transform.position;
             if (hit.OnHit(Faction, _damage))
             {
                 Effects3D.ImpactSparks(transform.position, -Velocity.normalized, _color);
-                Destroy(gameObject);
-                return;
+                if (SplashRadius > 0f) Splash(hitPos, hit);
+
+                // пробивающая пуля летит дальше, пока не исчерпает пробития
+                if (Pierce > 0)
+                {
+                    Pierce--;
+                    if (_alreadyHit == null) _alreadyHit = new List<Hittable3D>();
+                    _alreadyHit.Add(hit);
+                }
+                else
+                {
+                    Destroy(gameObject);
+                    return;
+                }
             }
         }
 
@@ -140,6 +153,33 @@ public class Projectile3D : MonoBehaviour
         {
             transform.rotation = Quaternion.LookRotation(Velocity);
         }
+    }
+
+    // ---------- Свойства цветных пуль (бонусы) ----------
+    public int Pierce;          // сколько целей пуля пробивает насквозь (зелёные)
+    public float SplashRadius;  // радиус взрыва при попадании (фиолетовые)
+    private List<Hittable3D> _alreadyHit;
+
+    public Projectile3D WithPerks(int damage, int pierce, float splashRadius)
+    {
+        _damage = Mathf.Max(1, damage);
+        Pierce = pierce;
+        SplashRadius = splashRadius;
+        return this;
+    }
+
+    // Взрыв задевает всех врагов вокруг точки попадания.
+    void Splash(Vector3 center, Hittable3D direct)
+    {
+        Effects3D.Explosion(center, SplashRadius * 0.12f, _color, Vector3.zero);
+        List<Hittable3D> victims = new List<Hittable3D>();
+        foreach (Hittable3D h in Hittable3D.All)
+        {
+            if (h == null || h == direct || !h.IsAlive || !Hittable3D.CanHit(Faction, h.Faction)) continue;
+            if ((h.transform.position - center).sqrMagnitude <= (SplashRadius + h.Radius) * (SplashRadius + h.Radius))
+                victims.Add(h);
+        }
+        foreach (Hittable3D h in victims) h.OnHit(Faction, _damage);
     }
 
     void UpdateHoming(float dt)

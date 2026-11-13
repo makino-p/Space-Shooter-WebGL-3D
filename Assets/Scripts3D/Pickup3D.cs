@@ -10,7 +10,11 @@ public enum PickupType
     Health,
     Radial,   // редкий: выстрел во все стороны
     Negative, // негативный: сбой двигателей
-    Homing    // редкий: самонаводящиеся ракеты
+    Homing,   // редкий: самонаводящиеся ракеты
+    GreenRounds,  // зелёные пули: пробивают до 3 целей
+    BlueRounds,   // синие плазменные: тройной урон
+    GoldRounds,   // золотые: скорострельность
+    PurpleRounds  // фиолетовые: взрыв по площади
 }
 
 public class Pickup3D : Hittable3D

@@ -110,9 +110,47 @@ public class Tunnel3D : MonoBehaviour
         return m;
     }
 
+    // ---------------- Начало луча: яркая звезда-источник ----------------
+    public float SourceZ = -330f;          // где стоит звезда (позади старта игрока)
+    public float SourceDiameter = 170f;
+    public float MinZ { get { return SourceZ + SourceDiameter * 0.5f + 40f; } } // за звезду не улететь
+
+    void BuildSource(Material cross)
+    {
+        Planets3D.BuildBeamSource(new Vector3(0f, 0f, SourceZ), SourceDiameter);
+
+        // неподвижное "основание" луча: выходит прямо из поверхности звезды и растворяется вперёд
+        float start = SourceZ;
+        float length = 900f;
+        FixedBeam("Beam_Origin_Glow", start, length, 4.5f, new Color(0.5f, 0.88f, 1f), cross);
+        FixedBeam("Beam_Origin_Core", start, length, 1.2f, Color.white, cross);
+    }
+
+    void FixedBeam(string name, float startZ, float length, float width, Color color, Material mat)
+    {
+        GameObject go = new GameObject(name);
+        LineRenderer lr = go.AddComponent<LineRenderer>();
+        lr.useWorldSpace = true;
+        lr.positionCount = 2;
+        lr.SetPosition(0, new Vector3(0f, 0f, startZ));
+        lr.SetPosition(1, new Vector3(0f, 0f, startZ + length));
+        lr.startWidth = width * 1.6f; // у звезды луч шире — "вырывается" из неё
+        lr.endWidth = width;
+        lr.sharedMaterial = mat;
+        lr.textureMode = LineTextureMode.Stretch;
+        lr.alignment = LineAlignment.View;
+        lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        lr.receiveShadows = false;
+        Gradient g = new Gradient();
+        g.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(color, 0.15f), new GradientColorKey(color, 1f) },
+                  new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0.9f, 0.4f), new GradientAlphaKey(0f, 1f) });
+        lr.colorGradient = g;
+    }
+
     void Build()
     {
         Material cross = BeamMaterial(CrossTexture);
+        BuildSource(cross);
         _plasmaMat = BeamMaterial(PlasmaTexture);
 
         _bloom = NewBeam("Beam_Bloom", 11f, new Color(0.25f, 0.45f, 1f), 0.22f, cross, LineTextureMode.Stretch);
@@ -233,6 +271,12 @@ public class Tunnel3D : MonoBehaviour
         {
             r = r.normalized * ArenaRadius;
             p = new Vector3(r.x, r.y, p.z);
+        }
+        // путь начинается у звезды-источника: дальше назад лететь нельзя
+        if (p.z < MinZ)
+        {
+            p.z = MinZ;
+            clamped = true;
         }
         return p;
     }
