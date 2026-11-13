@@ -214,6 +214,13 @@ MonoBehaviour:
   WeightHoming: 4
   MinPickupDelay: 5
   MaxPickupDelay: 8
+  WaveStartAfterMoving: 5
+  MusicTracks:
+  - {fileID: 8300000, guid: 2c72eefb403b8d4438549fbdd41a9538, type: 3}
+  - {fileID: 8300000, guid: 6758abe8bd2b6f84a94d5a7b99c1481b, type: 3}
+  - {fileID: 8300000, guid: 3a91df5151f082444af86225905d6179, type: 3}
+  MusicVolume: 0.45
+  MusicCrossfade: 2
 --- !u!4 &329844470
 Transform:
   m_ObjectHideFlags: 0

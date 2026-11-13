@@ -20,16 +20,21 @@ public class Tunnel3D : MonoBehaviour
     public float EndZ { get { return CurrentPlayerZ + EnemySpawnDistance; } }
     public Vector3 GatePosition { get { return new Vector3(0f, 0f, CurrentPlayerZ + EnemySpawnDistance); } }
 
-    private static readonly Color Core = new Color(0.85f, 0.97f, 1f);
-    private static readonly Color Glow = new Color(0.2f, 0.75f, 1f);
-    private static readonly Color Haze = new Color(0.35f, 0.3f, 1f);
 
-    private LineRenderer _core, _glow, _haze;
+    // ---------------- Визуал луча ----------------
+    // Слои (все с гауссовым затуханием поперёк — края растворяются, "поверхности" нет):
+    //   ядро (раскалённо-белое), свечение (голубое), текущая плазма (волокна бегут вдоль луча),
+    //   мягкий ореол. Плюс мерцание, сгустки энергии и движущиеся источники света.
+    private LineRenderer _core, _glow, _plasma, _bloom;
+    private Material _plasmaMat;
     private readonly List<Transform> _pulses = new List<Transform>();
     private readonly List<float> _pulseOffsets = new List<float>();
-    private const int PulseCount = 14;
+    private readonly List<Light> _lights = new List<Light>();
+    private const int PulseCount = 10;
     private const float PulseSpan = 1500f;
-    private const float PulseSpeed = 240f;
+    private const float PulseSpeed = 320f;
+
+    private static Texture2D _crossTex, _plasmaTex;
 
     float CurrentPlayerZ
     {
@@ -46,25 +51,102 @@ public class Tunnel3D : MonoBehaviour
 
     void Awake() { Instance = this; }
 
+    // Поперечный профиль: гаусс (v = поперёк ширины линии).
+    static Texture2D CrossTexture
+    {
+        get
+        {
+            if (_crossTex != null) return _crossTex;
+            const int h = 64;
+            _crossTex = new Texture2D(4, h, TextureFormat.RGBA32, false);
+            _crossTex.wrapMode = TextureWrapMode.Clamp;
+            for (int y = 0; y < h; y++)
+            {
+                float v = (y + 0.5f) / h * 2f - 1f;          // -1..1
+                float a = Mathf.Exp(-v * v * 4.5f);           // гаусс
+                a = Mathf.Clamp01((a - 0.012f) / 0.988f);     // точно ноль на краю
+                for (int x = 0; x < 4; x++) _crossTex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+            }
+            _crossTex.Apply();
+            return _crossTex;
+        }
+    }
+
+    // Плазма: тонкие волокна вдоль луча (u — вдоль, v — поперёк), тайлится по длине.
+    static Texture2D PlasmaTexture
+    {
+        get
+        {
+            if (_plasmaTex != null) return _plasmaTex;
+            const int w = 256, h = 64;
+            _plasmaTex = new Texture2D(w, h, TextureFormat.RGBA32, true);
+            _plasmaTex.wrapMode = TextureWrapMode.Repeat;
+            for (int y = 0; y < h; y++)
+            {
+                float v = (y + 0.5f) / h * 2f - 1f;
+                float across = Mathf.Exp(-v * v * 3f);
+                for (int x = 0; x < w; x++)
+                {
+                    float u = (float)x / w;
+                    // бесшовно по u: шум на окружности
+                    float cx = Mathf.Cos(u * Mathf.PI * 2f) * 2f, cy = Mathf.Sin(u * Mathf.PI * 2f) * 2f;
+                    float n = Mathf.PerlinNoise(cx + y * 0.35f, cy + 3.1f) * 0.6f
+                            + Mathf.PerlinNoise(cx * 2.3f + 9.7f, cy * 2.3f + y * 0.9f) * 0.4f;
+                    float filament = Mathf.Pow(Mathf.Clamp01(n * 1.6f - 0.35f), 2.2f);
+                    _plasmaTex.SetPixel(x, y, new Color(1f, 1f, 1f, filament * across));
+                }
+            }
+            _plasmaTex.Apply();
+            return _plasmaTex;
+        }
+    }
+
+    Material BeamMaterial(Texture tex)
+    {
+        Material baseMat = Factory3D.GlowFlat(Color.white);
+        Material m = new Material(baseMat);
+        m.mainTexture = tex;
+        m.SetColor("_TintColor", new Color(0.5f, 0.5f, 0.5f, 0.5f));
+        return m;
+    }
+
     void Build()
     {
-        // три слоя: белое ядро, голубое свечение, широкая фиолетовая дымка
-        _haze = NewBeam("Beam_Haze", 26f, Haze, 0.16f);
-        _glow = NewBeam("Beam_Glow", 7f, Glow, 0.55f);
-        _core = NewBeam("Beam_Core", 1.6f, Core, 1f);
+        Material cross = BeamMaterial(CrossTexture);
+        _plasmaMat = BeamMaterial(PlasmaTexture);
 
+        _bloom = NewBeam("Beam_Bloom", 11f, new Color(0.25f, 0.45f, 1f), 0.22f, cross, LineTextureMode.Stretch);
+        _glow = NewBeam("Beam_Glow", 3.2f, new Color(0.45f, 0.85f, 1f), 0.85f, cross, LineTextureMode.Stretch);
+        _plasma = NewBeam("Beam_Plasma", 2.2f, new Color(0.7f, 0.95f, 1f), 1f, _plasmaMat, LineTextureMode.Tile);
+        _core = NewBeam("Beam_Core", 0.8f, new Color(1f, 1f, 1f), 1f, cross, LineTextureMode.Stretch);
+
+        // сгустки энергии — компактные, без огромных шаров
         for (int i = 0; i < PulseCount; i++)
         {
             GameObject p = new GameObject("Beam_Pulse");
             p.transform.SetParent(transform, false);
-            Factory3D.GlowBall(p.transform, Vector3.zero, 10f, new Color(0.6f, 0.9f, 1f, 0.9f));
-            Factory3D.GlowBall(p.transform, Vector3.zero, 3.5f, Color.white);
+            Factory3D.GlowBall(p.transform, Vector3.zero, 4.5f, new Color(0.55f, 0.85f, 1f, 0.8f));
+            Factory3D.GlowBall(p.transform, Vector3.zero, 1.3f, Color.white);
             _pulses.Add(p.transform);
             _pulseOffsets.Add(i * PulseSpan / PulseCount);
         }
+
+        // свет от луча, подсвечивающий корабли рядом (несколько точечных источников вокруг игрока)
+        for (int i = 0; i < 3; i++)
+        {
+            GameObject lg = new GameObject("Beam_Light");
+            lg.transform.SetParent(transform, false);
+            Light l = lg.AddComponent<Light>();
+            l.type = LightType.Point;
+            l.color = new Color(0.5f, 0.8f, 1f);
+            l.range = 45f;
+            l.intensity = 1.6f;
+            l.shadows = LightShadows.None;
+            _lights.Add(l);
+        }
     }
 
-    LineRenderer NewBeam(string name, float width, Color color, float peakAlpha)
+    LineRenderer NewBeam(string name, float width, Color color, float peakAlpha, Material mat, LineTextureMode mode)
     {
         GameObject go = new GameObject(name);
         go.transform.SetParent(transform, false);
@@ -78,12 +160,14 @@ public class Tunnel3D : MonoBehaviour
         lr.SetPosition(4, new Vector3(0f, 0f, AheadLength));
         lr.startWidth = width;
         lr.endWidth = width;
-        lr.sharedMaterial = Factory3D.GlowFlat(Color.white);
+        lr.sharedMaterial = mat;
+        lr.textureMode = mode;
+        lr.alignment = LineAlignment.View;
         lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         lr.receiveShadows = false;
-        lr.numCapVertices = 4;
+        lr.numCapVertices = 0;
 
-        // яркий рядом с игроком, растворяется на обоих концах
+        // ярко рядом с игроком, растворяется на обоих концах
         float len = AheadLength + BehindLength;
         float playerT = BehindLength / len;
         Gradient g = new Gradient();
@@ -104,19 +188,33 @@ public class Tunnel3D : MonoBehaviour
     {
         float pz = CurrentPlayerZ;
         transform.position = new Vector3(0f, 0f, pz);
+        float t = Time.time;
 
-        // лёгкое "дыхание" луча
-        float breath = 1f + 0.08f * Mathf.Sin(Time.time * 6f) + 0.04f * Mathf.Sin(Time.time * 17f);
-        _core.startWidth = _core.endWidth = 1.6f * breath;
-        _glow.startWidth = _glow.endWidth = 7f * breath;
+        // мерцание энергии: смесь медленного шума и быстрой дрожи
+        float flicker = 0.9f + 0.1f * Mathf.PerlinNoise(t * 3f, 0.37f) + 0.04f * Mathf.Sin(t * 47f);
+        _core.startWidth = _core.endWidth = 0.8f * flicker;
+        _glow.startWidth = _glow.endWidth = 3.2f * (0.95f + 0.1f * Mathf.PerlinNoise(t * 1.7f, 4.2f));
+        _plasma.startWidth = _plasma.endWidth = 2.2f * flicker;
+        _bloom.startWidth = _bloom.endWidth = 11f * (0.92f + 0.12f * Mathf.PerlinNoise(t * 0.8f, 7.9f));
 
-        // импульсы бегут вперёд по лучу и исчезают вдали
+        // плазма течёт вперёд вдоль луча (сдвиг текстуры; плотность волокон — на единицу длины)
+        _plasmaMat.mainTextureScale = new Vector2(0.03f, 1f);
+        _plasmaMat.mainTextureOffset = new Vector2(-(t * 9f + pz * 0.03f), 0f);
+
+        // сгустки энергии бегут вперёд и растворяются вдали
         for (int i = 0; i < _pulses.Count; i++)
         {
-            float local = Mathf.Repeat(_pulseOffsets[i] + Time.time * PulseSpeed, PulseSpan) - BehindLength;
+            float local = Mathf.Repeat(_pulseOffsets[i] + t * PulseSpeed, PulseSpan) - BehindLength;
             _pulses[i].localPosition = new Vector3(0f, 0f, local);
             float fade = local < 0f ? Mathf.Clamp01(1f + local / BehindLength) : Mathf.Clamp01(1f - local / (PulseSpan - BehindLength));
-            _pulses[i].localScale = Vector3.one * Mathf.Lerp(0.2f, 1f, fade);
+            _pulses[i].localScale = Vector3.one * Mathf.Lerp(0.15f, 1f, fade);
+        }
+
+        // источники света: впереди, рядом и позади игрока — корабли у луча подсвечиваются
+        for (int i = 0; i < _lights.Count; i++)
+        {
+            _lights[i].transform.localPosition = new Vector3(0f, 0f, (i - 1) * 40f);
+            _lights[i].intensity = 1.6f * flicker;
         }
     }
 

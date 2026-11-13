@@ -187,10 +187,10 @@ public class Player3D : Hittable3D
 
         transform.rotation = Quaternion.Euler(_pitch, _yaw, 0f);
 
-        _yawInput = Mathf.Clamp((_yawVelocity + _spinRate) / 120f, -1f, 1f);
+        _yawInput = Mathf.Clamp(_yawVelocity / 120f, -1f, 1f);
     }
 
-    // ---------- Разворот на правую кнопку мыши ----------
+    // ---------- Вращение вокруг своей оси на правую кнопку мыши ----------
     // Чем дольше держишь ПКМ, тем быстрее корабль вращается вокруг своей оси.
     // Скорость растёт линейно, поэтому за SpinFullTurnTime секунд набегает ровно 360°.
     // После отпускания вращение плавно затухает, без рывка.
@@ -199,6 +199,7 @@ public class Player3D : Hittable3D
     public float SpinStopRate = 260f;     // как быстро гаснет вращение после отпускания (град/с²)
     private float _spinHeld;
     private float _spinRate;              // текущая скорость вращения, град/с
+    private float _spinRoll;              // накопленный угол вращения модели вокруг продольной оси
 
     void HandleSpin()
     {
@@ -215,11 +216,15 @@ public class Player3D : Hittable3D
             _spinRate = Mathf.MoveTowards(_spinRate, 0f, SpinStopRate * Time.deltaTime);
         }
 
+        // вращение вокруг продольной оси корабля ("бочка"): курс и камера не меняются
         if (_spinRate > 0.001f)
         {
-            float delta = _spinRate * Time.deltaTime;
-            _yaw += delta;
-            _targetYaw += delta; // цель поворачивается вместе с кораблём, чтобы сглаживание не тянуло назад
+            _spinRoll = Mathf.Repeat(_spinRoll - _spinRate * Time.deltaTime, 360f);
+        }
+        else if (_spinRoll > 0.01f)
+        {
+            // после остановки плавно доворачивается в ровное положение кратчайшим путём
+            _spinRoll = Mathf.Repeat(Mathf.MoveTowardsAngle(_spinRoll, 0f, 120f * Time.deltaTime), 360f);
         }
     }
 
@@ -383,7 +388,7 @@ public class Player3D : Hittable3D
         // крен модели при повороте и стрейфе
         float targetRoll = -_yawInput * 40f - _strafeInput * 25f;
         _roll = Mathf.Lerp(_roll, targetRoll, Time.deltaTime * 5f);
-        _model.localRotation = Quaternion.Euler(0f, 0f, _roll);
+        _model.localRotation = Quaternion.Euler(0f, 0f, _roll + _spinRoll); // + вращение вокруг своей оси (ПКМ)
 
 
         foreach (ParticleSystem ps in _trails)

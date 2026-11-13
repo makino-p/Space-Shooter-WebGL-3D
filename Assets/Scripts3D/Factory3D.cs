@@ -456,7 +456,15 @@ public static class Factory3D
         model.transform.SetParent(parent, false);
 
         Bounds b;
-        if (_transportPrefab != null)
+        if (HasImportedEnemies)
+        {
+            // те же модели, что у врагов (случайная), но в белой "гражданской" окраске
+            int count = Mathf.Max(1, _enemyPrefabs.Length - 1); // последний — босс, его не берём
+            GameObject prefab = _enemyPrefabs[Random.Range(0, count)];
+            Material mat = _transportMat != null ? _transportMat : _enemyMats[0];
+            b = PlaceShipModel(prefab, model.transform, _enemyEuler, _enemyLength * 1.3f, mat);
+        }
+        else if (_transportPrefab != null)
         {
             b = PlaceShipModel(_transportPrefab, model.transform, _enemyEuler, 10f, _transportMat);
         }
@@ -466,17 +474,6 @@ public static class Factory3D
             Part(PrimitiveType.Cube, model.transform, Vector3.zero, new Vector3(2.2f, 1.6f, 10f), hullMat);
             Part(PrimitiveType.Cube, model.transform, new Vector3(0f, 0.6f, 4.2f), new Vector3(1.6f, 1f, 1.6f), hullMat);
             b = new Bounds(Vector3.zero, new Vector3(2.2f, 1.6f, 10f));
-        }
-
-        // грузовые контейнеры разных цветов
-        Color[] cargo = { new Color(0.85f, 0.35f, 0.15f), new Color(0.2f, 0.45f, 0.8f), new Color(0.75f, 0.7f, 0.2f), new Color(0.3f, 0.6f, 0.35f) };
-        float side = Mathf.Max(b.extents.x * 0.55f, 1.4f);
-        for (int i = 0; i < 3; i++)
-        {
-            float z = Mathf.Lerp(-b.extents.z * 0.55f, b.extents.z * 0.25f, i / 2f);
-            Material m = Lit(cargo[Random.Range(0, cargo.Length)], 0f, 0.2f, 0.35f);
-            Part(PrimitiveType.Cube, model.transform, new Vector3(-side, -0.4f, z), new Vector3(1.3f, 1.3f, 2.2f), m);
-            Part(PrimitiveType.Cube, model.transform, new Vector3(side, -0.4f, z), new Vector3(1.3f, 1.3f, 2.2f), m);
         }
 
         GlowBall(model.transform, new Vector3(-b.extents.x - 0.3f, 0f, 0f), 1.4f, new Color(1f, 0.1f, 0.1f, 1f));   // левый — красный
