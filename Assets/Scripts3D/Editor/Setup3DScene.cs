@@ -42,11 +42,12 @@ public static class Setup3DScene
             {
                 Build();
             }
-            else if (modelsMissing || SceneNeedsAssets() || ThirdPartyAssets3D.NeedsSetup() || ImportedShips3D.NeedsSetup())
+            else if (modelsMissing || SceneNeedsAssets() || ThirdPartyAssets3D.NeedsSetup() || ImportedShips3D.NeedsSetup() || RealisticPlanets3D.NeedsSetup())
             {
                 if (modelsMissing) BuildSpriteModels();
                 ThirdPartyAssets3D.Setup();
                 ImportedShips3D.Setup();
+                RealisticPlanets3D.Setup();
                 AssignAssetsToScene();
             }
         };
@@ -59,6 +60,7 @@ public static class Setup3DScene
         BuildSpriteModels();
         ThirdPartyAssets3D.Setup();
         ImportedShips3D.Setup();
+        RealisticPlanets3D.Setup();
 
         Scene active = SceneManager.GetActiveScene();
         bool activeIsUntitled = !active.IsValid() || string.IsNullOrEmpty(active.path);
@@ -142,7 +144,7 @@ public static class Setup3DScene
         bool rocksMissing = ThirdPartyAssets3D.AvailableRocks().Count > 0 && !rocksAssigned;
         bool smokeMissing = !yaml.Contains("SmokeMaterial: {fileID: 2100000");
         return spriteMissing || skyMissing || rocksMissing || smokeMissing || ImportedShips3D.SceneNeedsAssets(yaml)
-            || Soundtracks3D.SceneNeedsAssets(yaml);
+            || Soundtracks3D.SceneNeedsAssets(yaml) || RealisticPlanets3D.SceneNeedsAssets(yaml);
     }
 
     static void Assign(Game3D game)
@@ -175,6 +177,7 @@ public static class Setup3DScene
         ThirdPartyAssets3D.AssignTo(game);
         ImportedShips3D.AssignTo(game);
         Soundtracks3D.AssignTo(game);
+        RealisticPlanets3D.AssignTo(game);
     }
 
     // ---------------- Модели из спрайтов ----------------

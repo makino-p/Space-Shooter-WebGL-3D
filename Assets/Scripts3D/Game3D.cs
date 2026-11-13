@@ -44,6 +44,15 @@ public class Game3D : MonoBehaviour
     public float TransportMinSpeed = 55f;
     public float TransportMaxSpeed = 95f;
 
+    [Header("Realistic planets (Solar System Scope, CC BY 4.0)")]
+    public Material EarthMaterial;
+    public Material JupiterMaterial;
+    public Material SaturnMaterial;
+    public Material SaturnRingMaterial;
+    public Material MarsMaterial;
+    public Material MoonMaterial;
+    public Texture2D SunTexture;
+
     [Header("Downloaded assets (NASA sky, Poly Haven rocks)")]
     public Material SkyboxMaterial;
     public Mesh[] RockMeshes;
@@ -101,6 +110,7 @@ public class Game3D : MonoBehaviour
 
         BuildEnvironment();
         BuildAudio();
+        Planets3D.SunTexture = SunTexture; // звезда-источник луча получит поверхность Солнца
         Tunnel3D tunnel = Tunnel3D.Create();
 
         UI = gameObject.AddComponent<UI3D>();
@@ -178,9 +188,7 @@ public class Game3D : MonoBehaviour
 
         // далёкая планета и туманности для ориентации в пространстве
         // фон следует за камерой, поэтому на бесконечном пути он всегда "на горизонте"
-        Planets3D.Build(Planets3D.Style.NeonGasGiant, new Vector3(-700f, -220f, 950f), 520f, 18f, 3);
-        Planets3D.Build(Planets3D.Style.NeonCityWorld, new Vector3(950f, 320f, 1250f), 300f, -12f, 7);
-        Planets3D.Build(Planets3D.Style.IceMoon, new Vector3(380f, -420f, 700f), 140f, 25f, 11);
+        BuildPlanets();
 
         if (SkyboxMaterial == null)
         {
@@ -188,6 +196,29 @@ public class Game3D : MonoBehaviour
             Factory3D.GlowBall(null, new Vector3(-200f, 400f, -500f), 600f, new Color(0.15f, 0.35f, 0.6f, 0.2f)).AddComponent<FollowCamera3D>();
             Factory3D.GlowBall(null, new Vector3(300f, -350f, 400f), 500f, new Color(0.7f, 0.35f, 0.1f, 0.18f)).AddComponent<FollowCamera3D>();
         }
+    }
+
+    // Планеты на горизонте: реалистичные (если текстуры скачаны) или процедурные неоновые.
+    void BuildPlanets()
+    {
+        if (EarthMaterial != null)
+        {
+            // Земля — крупная, с Луной рядом; Юпитер и Сатурн с кольцами — по сторонам; Марс — выше пути
+            Planets3D.BuildRealistic("Earth", EarthMaterial, new Vector3(-640f, -190f, 880f), 430f, 23f, 1.5f);
+            if (MoonMaterial != null)
+                Planets3D.BuildRealistic("Moon", MoonMaterial, new Vector3(-330f, 40f, 640f), 115f, 6f, 0.6f);
+            if (JupiterMaterial != null)
+                Planets3D.BuildRealistic("Jupiter", JupiterMaterial, new Vector3(1050f, 330f, 1250f), 520f, 3f, 2.5f);
+            if (SaturnMaterial != null)
+                Planets3D.BuildRealistic("Saturn", SaturnMaterial, new Vector3(820f, -360f, 520f), 260f, 26f, 2.2f, SaturnRingMaterial);
+            if (MarsMaterial != null)
+                Planets3D.BuildRealistic("Mars", MarsMaterial, new Vector3(-420f, 520f, 1100f), 170f, 25f, 1.2f);
+            return;
+        }
+
+        Planets3D.Build(Planets3D.Style.NeonGasGiant, new Vector3(-700f, -220f, 950f), 520f, 18f, 3);
+        Planets3D.Build(Planets3D.Style.NeonCityWorld, new Vector3(950f, 320f, 1250f), 300f, -12f, 7);
+        Planets3D.Build(Planets3D.Style.IceMoon, new Vector3(380f, -420f, 700f), 140f, 25f, 11);
     }
 
     void SpawnAsteroidField(int count)

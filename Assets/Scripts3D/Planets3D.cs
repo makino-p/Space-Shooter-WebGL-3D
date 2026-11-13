@@ -47,7 +47,125 @@ public static class Planets3D
         return root;
     }
 
+    // ---------------- Реалистичные планеты (текстуры Solar System Scope + шейдер RealisticPlanet) ----------------
+    // Сфера высокой детализации (гладкий силуэт вблизи), медленное вращение, по желанию — кольца.
+    public static GameObject BuildRealistic(string name, Material surface, Vector3 offsetFromCamera, float diameter,
+                                            float tiltDeg, float spinDegPerSec, Material ringMaterial = null,
+                                            float ringInner = 1.24f, float ringOuter = 2.27f)
+    {
+        GameObject root = new GameObject("Planet_" + name);
+        root.transform.position = offsetFromCamera;
+        root.transform.rotation = Quaternion.Euler(tiltDeg, 0f, tiltDeg * 0.35f);
+
+        GameObject body = new GameObject("Surface");
+        body.transform.SetParent(root.transform, false);
+        body.transform.localScale = Vector3.one * diameter;
+        body.AddComponent<MeshFilter>().sharedMesh = UvSphere;
+        MeshRenderer mr = body.AddComponent<MeshRenderer>();
+        mr.sharedMaterial = surface;
+        mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        body.AddComponent<Spin3D>().DegreesPerSecond = spinDegPerSec;
+
+        if (ringMaterial != null)
+        {
+            GameObject ring = new GameObject("Rings");
+            ring.transform.SetParent(root.transform, false);
+            ring.transform.localScale = Vector3.one * (diameter * 0.5f);
+            ring.AddComponent<MeshFilter>().sharedMesh = RingMesh(ringInner, ringOuter);
+            MeshRenderer rr = ring.AddComponent<MeshRenderer>();
+            rr.sharedMaterial = ringMaterial;
+            rr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+
+        root.AddComponent<FollowCamera3D>();
+        return root;
+    }
+
+    private static Mesh _uvSphere;
+
+    // UV-сфера диаметром 1 с правильной развёрткой под равнопромежуточные карты планет и касательными.
+    static Mesh UvSphere
+    {
+        get
+        {
+            if (_uvSphere != null) return _uvSphere;
+            const int lon = 128, lat = 64;
+            Vector3[] v = new Vector3[(lon + 1) * (lat + 1)];
+            Vector3[] n = new Vector3[v.Length];
+            Vector2[] uv = new Vector2[v.Length];
+            Vector4[] tan = new Vector4[v.Length];
+            for (int y = 0; y <= lat; y++)
+            {
+                float vy = (float)y / lat;
+                float theta = vy * Mathf.PI;                  // 0..PI от северного полюса
+                for (int x = 0; x <= lon; x++)
+                {
+                    float ux = (float)x / lon;
+                    float phi = ux * Mathf.PI * 2f;
+                    Vector3 p = new Vector3(-Mathf.Sin(theta) * Mathf.Cos(phi), Mathf.Cos(theta), Mathf.Sin(theta) * Mathf.Sin(phi));
+                    int i = y * (lon + 1) + x;
+                    v[i] = p * 0.5f;
+                    n[i] = p;
+                    uv[i] = new Vector2(ux, 1f - vy);
+                    Vector3 t = new Vector3(Mathf.Sin(phi), 0f, Mathf.Cos(phi)); // направление роста долготы
+                    tan[i] = new Vector4(t.x, t.y, t.z, -1f);
+                }
+            }
+            int[] tris = new int[lon * lat * 6];
+            int k = 0;
+            for (int y = 0; y < lat; y++)
+            {
+                for (int x = 0; x < lon; x++)
+                {
+                    int a = y * (lon + 1) + x, b = a + 1, c = a + lon + 1, d = c + 1;
+                    tris[k++] = a; tris[k++] = b; tris[k++] = c;
+                    tris[k++] = b; tris[k++] = d; tris[k++] = c;
+                }
+            }
+            _uvSphere = new Mesh { name = "PlanetSphere" };
+            _uvSphere.vertices = v;
+            _uvSphere.normals = n;
+            _uvSphere.uv = uv;
+            _uvSphere.tangents = tan;
+            _uvSphere.triangles = tris;
+            _uvSphere.RecalculateBounds();
+            return _uvSphere;
+        }
+    }
+
+    // Плоское кольцо: u — от внутреннего края к внешнему (так устроена текстура колец Сатурна).
+    static Mesh RingMesh(float inner, float outer)
+    {
+        const int seg = 180;
+        Vector3[] v = new Vector3[(seg + 1) * 2];
+        Vector2[] uv = new Vector2[v.Length];
+        int[] tris = new int[seg * 6];
+        for (int i = 0; i <= seg; i++)
+        {
+            float a = i * Mathf.PI * 2f / seg;
+            Vector3 dir = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+            v[i * 2] = dir * inner;
+            v[i * 2 + 1] = dir * outer;
+            uv[i * 2] = new Vector2(0f, 0.5f);
+            uv[i * 2 + 1] = new Vector2(1f, 0.5f);
+            if (i < seg)
+            {
+                int t = i * 6, b = i * 2;
+                tris[t] = b; tris[t + 1] = b + 2; tris[t + 2] = b + 1;
+                tris[t + 3] = b + 1; tris[t + 4] = b + 2; tris[t + 5] = b + 3;
+            }
+        }
+        Mesh m = new Mesh { name = "PlanetRings" };
+        m.vertices = v;
+        m.uv = uv;
+        m.triangles = tris;
+        m.RecalculateNormals();
+        m.RecalculateBounds();
+        return m;
+    }
+
     // ---------------- Звезда-источник луча (начало пути) ----------------
+    public static Texture2D SunTexture; // поверхность Солнца (Solar System Scope), если скачана
     // Неподвижна в мире: раскалённая поверхность, многослойная корона, неоновые кольца,
     // мощный свет и "основание" луча, выходящее из её поверхности.
     public static GameObject BuildBeamSource(Vector3 position, float diameter)
@@ -80,11 +198,11 @@ public static class Planets3D
         emission.SetPixels32(e); emission.Apply(true);
 
         Material m = Factory3D.LitBase != null ? new Material(Factory3D.LitBase) : new Material(Shader.Find("Standard"));
-        m.mainTexture = albedo;
+        m.mainTexture = SunTexture != null ? (Texture)SunTexture : albedo; // настоящая поверхность Солнца, если скачана
         m.SetFloat("_Metallic", 0f);
         m.SetFloat("_Glossiness", 0.1f);
         m.EnableKeyword("_EMISSION");
-        m.SetTexture("_EmissionMap", emission);
+        m.SetTexture("_EmissionMap", SunTexture != null ? (Texture)SunTexture : emission);
         m.SetColor("_EmissionColor", new Color(3.2f, 3.2f, 3.2f));
 
         GameObject body = Factory3D.Part(PrimitiveType.Sphere, root.transform, Vector3.zero, Vector3.one * diameter, m);
@@ -92,9 +210,9 @@ public static class Planets3D
         body.AddComponent<Spin3D>().DegreesPerSecond = 3f;
 
         // корона в несколько слоёв
-        Factory3D.GlowBall(root.transform, Vector3.zero, diameter * 1.35f, new Color(0.85f, 0.95f, 1f, 0.9f));
-        Factory3D.GlowBall(root.transform, Vector3.zero, diameter * 2.2f, new Color(0.3f, 0.75f, 1f, 0.55f));
-        Factory3D.GlowBall(root.transform, Vector3.zero, diameter * 3.6f, new Color(0.45f, 0.3f, 1f, 0.28f));
+        Factory3D.GlowBall(root.transform, Vector3.zero, diameter * 1.35f, SunTexture != null ? new Color(1f, 0.92f, 0.75f, 0.9f) : new Color(0.85f, 0.95f, 1f, 0.9f));
+        Factory3D.GlowBall(root.transform, Vector3.zero, diameter * 2.2f, SunTexture != null ? new Color(1f, 0.6f, 0.25f, 0.5f) : new Color(0.3f, 0.75f, 1f, 0.55f));
+        Factory3D.GlowBall(root.transform, Vector3.zero, diameter * 3.6f, SunTexture != null ? new Color(1f, 0.35f, 0.15f, 0.25f) : new Color(0.45f, 0.3f, 1f, 0.28f));
 
         // неоновые кольца вокруг
         Spin3D r1 = AddNeonRing(root.transform, diameter * 0.85f, 2.5f, new Color(0.3f, 0.9f, 1f), 0f).AddComponent<Spin3D>();
@@ -105,7 +223,7 @@ public static class Planets3D
         // свет звезды освещает всё начало пути
         Light l = root.AddComponent<Light>();
         l.type = LightType.Point;
-        l.color = new Color(0.6f, 0.85f, 1f);
+        l.color = SunTexture != null ? new Color(1f, 0.88f, 0.7f) : new Color(0.6f, 0.85f, 1f);
         l.range = diameter * 6f;
         l.intensity = 2.5f;
         l.shadows = LightShadows.None;
