@@ -19,7 +19,7 @@ public class Boss3D : Hittable3D
     public override bool IsAlive { get { return _alive; } }
     public float Health01 { get { return (float)_health / MaxHealth; } }
 
-    private static readonly Color ShotColor = new Color(1f, 0.45f, 0.1f);
+    private static readonly Color ShotColor = new Color(1f, 0.1f, 0.06f);
 
     void Start()
     {

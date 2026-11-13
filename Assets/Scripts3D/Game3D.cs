@@ -35,6 +35,14 @@ public class Game3D : MonoBehaviour
     public Vector3 EnemyShipEuler = Vector3.zero;
     public float EnemyShipLength = 5.5f;
     public float BossShipLength = 26f;
+    public GameObject TransportShipPrefab;
+    public Material TransportShipMaterial;
+
+    [Header("Transports (поток вдоль луча)")]
+    public float TransportInterval = 0.9f;   // как часто появляются
+    public int MaxTransports = 28;
+    public float TransportMinSpeed = 55f;
+    public float TransportMaxSpeed = 95f;
 
     [Header("Downloaded assets (NASA sky, Poly Haven rocks)")]
     public Material SkyboxMaterial;
@@ -82,6 +90,8 @@ public class Game3D : MonoBehaviour
         Factory3D.SetRockModels(RockMeshes, RockMaterials);
         Factory3D.SetImportedShips(PlayerShipPrefab, PlayerShipEuler, PlayerShipLength,
                                    EnemyShipPrefabs, EnemyShipMaterials, EnemyShipEuler, EnemyShipLength, BossShipLength);
+        Factory3D.SetTransportShip(TransportShipPrefab, TransportShipMaterial);
+        Transport3D.Active.Clear();
         Hittable3D.All.Clear();
         Projectile3D.Active.Clear();
         Pickup3D.Pickups.Clear();
@@ -94,7 +104,7 @@ public class Game3D : MonoBehaviour
 
         // игрок стоит на оси пути, носом туда, откуда прилетают враги
         GameObject playerGo = new GameObject("Player");
-        playerGo.transform.position = Vector3.zero;
+        playerGo.transform.position = new Vector3(0f, -22f, 0f); // чуть ниже луча, чтобы он был виден
         playerGo.transform.rotation = Quaternion.identity;
         _player = playerGo.AddComponent<Player3D>();
         Factory3D.SpaceDust(playerGo.transform);
@@ -102,7 +112,7 @@ public class Game3D : MonoBehaviour
         CameraRig.SetTarget(playerGo.transform);
 
         // стартовый астероид прямо по курсу — уничтожь его, чтобы начать
-        Asteroid3D.Spawn(new Vector3(0f, 0f, 45f), 6f, true);
+        Asteroid3D.Spawn(new Vector3(0f, -22f, 50f), 6f, true);
         SpawnAsteroidField(45);
     }
 
@@ -112,6 +122,7 @@ public class Game3D : MonoBehaviour
         UI.SetWave(0, TotalWaves);
         UI.ShowMessage("DESTROY THE ASTEROID TO BEGIN", 4f, Color.white);
         UI.ShowControlsHint();
+        StartCoroutine(TransportRoutine());
     }
 
     // ---------------- Мир ----------------
@@ -166,12 +177,9 @@ public class Game3D : MonoBehaviour
 
         // далёкая планета и туманности для ориентации в пространстве
         // фон следует за камерой, поэтому на бесконечном пути он всегда "на горизонте"
-        GameObject planetRoot = new GameObject("Planet");
-        planetRoot.transform.position = new Vector3(-700f, -220f, 950f);
-        Factory3D.Part(PrimitiveType.Sphere, planetRoot.transform, Vector3.zero, Vector3.one * 480f,
-                       Factory3D.Lit(new Color(0.25f, 0.4f, 0.75f), 0.05f, 0f, 0.2f));
-        Factory3D.GlowBall(planetRoot.transform, Vector3.zero, 780f, new Color(0.2f, 0.4f, 1f, 0.35f));
-        planetRoot.AddComponent<FollowCamera3D>();
+        Planets3D.Build(Planets3D.Style.NeonGasGiant, new Vector3(-700f, -220f, 950f), 520f, 18f, 3);
+        Planets3D.Build(Planets3D.Style.NeonCityWorld, new Vector3(950f, 320f, 1250f), 300f, -12f, 7);
+        Planets3D.Build(Planets3D.Style.IceMoon, new Vector3(380f, -420f, 700f), 140f, 25f, 11);
 
         if (SkyboxMaterial == null)
         {
@@ -295,6 +303,40 @@ public class Game3D : MonoBehaviour
         }
     }
 
+    // ---------------- Транспортники ----------------
+    // Плотный поток грузовых кораблей вдоль луча — идёт всю игру, независимо от волн.
+    IEnumerator TransportRoutine()
+    {
+        // сразу немного кораблей, чтобы путь не был пустым
+        for (int i = 0; i < 10; i++) SpawnTransport(true);
+        while (!IsGameOver)
+        {
+            if (Transport3D.Active.Count < MaxTransports)
+            {
+                SpawnTransport(false);
+            }
+            yield return new WaitForSeconds(TransportInterval * Random.Range(0.6f, 1.4f));
+        }
+    }
+
+    void SpawnTransport(bool initial)
+    {
+        if (_player == null) return;
+        float pz = _player.transform.position.z;
+
+        bool fromAhead = Random.value < 0.7f; // большинство идёт навстречу игроку
+        float z;
+        if (initial) z = pz + Random.Range(-150f, 900f);
+        else z = fromAhead ? pz + Random.Range(1100f, 1500f) : pz - Random.Range(350f, 450f);
+        float dirZ = fromAhead ? -1f : 1f;
+
+        // идут вплотную к лучу
+        float angle = Random.Range(0f, Mathf.PI * 2f);
+        float r = Random.Range(5f, 13f);
+        Vector3 pos = new Vector3(Mathf.Cos(angle) * r, Mathf.Sin(angle) * r, z);
+        Transport3D.Spawn(pos, dirZ, Random.Range(TransportMinSpeed, TransportMaxSpeed));
+    }
+
     // ---------------- Волны ----------------
     public void StartWaves()
     {
@@ -309,7 +351,7 @@ public class Game3D : MonoBehaviour
         int n = 0;
         foreach (Hittable3D h in Hittable3D.All)
         {
-            if (h != null && h.IsAlive && h.Faction == Faction3D.Enemy) n++;
+            if (h != null && h.IsAlive && (h is Enemy3D || h is Boss3D)) n++; // транспортники не считаются
         }
         return n;
     }

@@ -36,6 +36,7 @@ public class Player3D : Hittable3D
     public int MaxAmmo = 15;
     public float FireRate = 0.18f;
     public float ShotSpeed = 130f;
+    public Color BulletColor = new Color(1f, 0.12f, 0.08f); // красные пули-капсулы
     public float ShotLifetime = 7f;       // дальность ~900 — астероид можно сбить с любой видимой дистанции
     public float AimAssistRange = 90f;    // на этой дистанции пули сами доворачивают к врагу
     public float AimAssistCone = 22f;     // насколько точно нужно целиться (градусы)
@@ -275,7 +276,7 @@ public class Player3D : Hittable3D
         }
 
         Ammo--;
-        Color shotColor = new Color(0.3f, 0.85f, 1f);
+        Color shotColor = BulletColor;
         Vector3 gun = transform.TransformPoint(GunPoints[_gunIndex]);
         _gunIndex = 1 - _gunIndex;
         Vector3 aim = AimDirection(gun);
@@ -285,7 +286,7 @@ public class Player3D : Hittable3D
             foreach (Vector3 gp in GunPoints)
             {
                 Vector3 p = transform.TransformPoint(gp);
-                Projectile3D.Spawn(Faction3D.Player, p, AimDirection(p), 70f, new Color(1f, 0.35f, 1f), 4f, 1.3f, true);
+                Projectile3D.Spawn(Faction3D.Player, p, AimDirection(p), 70f, BulletColor, 4f, 1.3f, true);
             }
         }
         else if (_radial)
@@ -298,7 +299,7 @@ public class Player3D : Hittable3D
                 float r = Mathf.Sqrt(1f - y * y);
                 float th = golden * i;
                 Vector3 dir = transform.TransformDirection(new Vector3(Mathf.Cos(th) * r, y, Mathf.Sin(th) * r));
-                Projectile3D.Spawn(Faction3D.Player, transform.position + dir * 2.5f, dir, 90f, new Color(1f, 1f, 0.7f), 1.6f);
+                Projectile3D.Spawn(Faction3D.Player, transform.position + dir * 2.5f, dir, 90f, BulletColor, 1.6f);
             }
         }
         else if (_triple)
@@ -306,7 +307,7 @@ public class Player3D : Hittable3D
             for (int i = -1; i <= 1; i++)
             {
                 Vector3 dir = Quaternion.AngleAxis(i * 4f, transform.up) * aim;
-                Projectile3D.Spawn(Faction3D.Player, transform.position + transform.forward * 2f + transform.right * i * 1.5f, dir, ShotSpeed, new Color(1f, 0.9f, 0.3f), ShotLifetime).EnableAimAssist(AimAssistRange, AimAssistCone);
+                Projectile3D.Spawn(Faction3D.Player, transform.position + transform.forward * 2f + transform.right * i * 1.5f, dir, ShotSpeed, BulletColor, ShotLifetime).EnableAimAssist(AimAssistRange, AimAssistCone);
             }
         }
         else

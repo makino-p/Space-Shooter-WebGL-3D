@@ -53,7 +53,7 @@ public class Enemy3D : Hittable3D
     private float _dodgeUntil;
     private float _nextDodgeCheck;
 
-    private static readonly Color ShotColor = new Color(1f, 0.3f, 0.15f);
+    private static readonly Color ShotColor = new Color(1f, 0.1f, 0.06f);
     private const float ShotSpeed = 70f;
 
     public static Enemy3D Spawn(Enemy3DType type, Vector3 position, bool shielded, int wave)

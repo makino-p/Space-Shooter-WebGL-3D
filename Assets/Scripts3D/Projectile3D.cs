@@ -25,9 +25,12 @@ public class Projectile3D : MonoBehaviour
         go.transform.position = position;
         go.transform.rotation = Quaternion.LookRotation(direction);
 
-        // лазерный болт: раскалённое белое ядро + цветной ореол + светящийся след
-        Factory3D.GlowBall(go.transform, Vector3.zero, 0.9f * size, new Color(1f, 1f, 1f, 1f));
-        Factory3D.GlowBall(go.transform, Vector3.zero, 2.4f * size, new Color(color.r, color.g, color.b, 0.85f));
+        // снаряд-капсула: светящаяся капсула вдоль полёта + раскалённая сердцевина + ореол + след
+        Factory3D.Part(PrimitiveType.Capsule, go.transform, Vector3.zero, new Vector3(0.38f, 1.25f, 0.38f) * size,
+                       Factory3D.Lit(color, 6f, 0f, 0.9f), new Vector3(90f, 0f, 0f));
+        Factory3D.Part(PrimitiveType.Capsule, go.transform, Vector3.zero, new Vector3(0.16f, 1.05f, 0.16f) * size,
+                       Factory3D.Lit(Color.Lerp(color, Color.white, 0.75f), 8f, 0f, 0.9f), new Vector3(90f, 0f, 0f));
+        Factory3D.GlowBall(go.transform, Vector3.zero, 2.6f * size, new Color(color.r, color.g, color.b, 0.75f));
 
         TrailRenderer trail = go.AddComponent<TrailRenderer>();
         trail.sharedMaterial = Factory3D.GlowFlat(Color.white);

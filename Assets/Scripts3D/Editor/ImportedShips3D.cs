@@ -22,6 +22,9 @@ public static class ImportedShips3D
     public static readonly string[] EnemyColors = { "Red", "Green", "Orange", "Purple", "Cyan", "Black", "Grey" };
     // Модели кораблей для каждого типа врага и для босса (номера примеров пака).
     public static readonly int[] EnemyShipNumbers = { 3, 8, 14, 21, 27, 33, 40 };
+    public const string TransportColor = "White";
+    public const int TransportShipNumber = 12;
+    static readonly string[] AllColors = { "Red", "Green", "Orange", "Purple", "Cyan", "Black", "Grey", "White" };
 
     public static bool HasF3 { get { return File.Exists(PlayerPrefabPath); } }
     public static bool HasSparrow { get { return Directory.Exists(SparrowExamples); } }
@@ -29,7 +32,7 @@ public static class ImportedShips3D
     public static bool NeedsSetup()
     {
         if (!HasSparrow) return false;
-        foreach (string c in EnemyColors)
+        foreach (string c in AllColors)
         {
             if (!File.Exists(MatPath(c))) return true;
         }
@@ -67,7 +70,7 @@ public static class ImportedShips3D
         Texture2D metal = AssetDatabase.LoadAssetAtPath<Texture2D>(SparrowStdTextures + "StarSparrow_MetallicSmoothness_Standard.png");
         Texture2D emission = AssetDatabase.LoadAssetAtPath<Texture2D>(SparrowStdTextures + "StarSparrow_Emission.png");
 
-        foreach (string color in EnemyColors)
+        foreach (string color in AllColors)
         {
             string path = MatPath(color);
             Material m = AssetDatabase.LoadAssetAtPath<Material>(path);
@@ -128,7 +131,8 @@ public static class ImportedShips3D
     public static bool SceneNeedsAssets(string sceneYaml)
     {
         return (HasF3 && !FieldHasGuid(sceneYaml, "PlayerShipPrefab:"))
-            || (HasSparrow && !FieldHasGuid(sceneYaml, "EnemyShipPrefabs:"));
+            || (HasSparrow && !FieldHasGuid(sceneYaml, "EnemyShipPrefabs:"))
+            || (HasSparrow && !FieldHasGuid(sceneYaml, "TransportShipPrefab:"));
     }
 
     static bool FieldHasGuid(string yaml, string field)
@@ -156,5 +160,9 @@ public static class ImportedShips3D
         }
         game.EnemyShipPrefabs = ships.ToArray();
         game.EnemyShipMaterials = mats.ToArray();
+
+        // транспортник — длинный корабль Star Sparrow в белой "гражданской" окраске
+        game.TransportShipPrefab = HasSparrow ? AssetDatabase.LoadAssetAtPath<GameObject>(SparrowExamples + "StarSparrow" + TransportShipNumber + ".prefab") : null;
+        game.TransportShipMaterial = HasSparrow ? AssetDatabase.LoadAssetAtPath<Material>(MatPath(TransportColor)) : null;
     }
 }

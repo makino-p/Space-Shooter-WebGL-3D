@@ -334,6 +334,7 @@ public class UI3D : MonoBehaviour
             if (h == null || !h.IsAlive) continue;
             bool isEnemy = h.Faction == Faction3D.Enemy;
             bool isPickup = h.Faction == Faction3D.Pickup;
+            if (h is Transport3D) continue; // транспортники мирные и их много — стрелки не нужны
             if (!isEnemy && !isPickup) continue;
 
             Vector3 sp = cam.WorldToScreenPoint(h.transform.position);

@@ -434,6 +434,54 @@ public static class Factory3D
     }
 
     // ---------------- Босс ----------------
+    // ---------------- Транспортник ----------------
+    private static GameObject _transportPrefab;
+    private static Material _transportMat;
+
+    public static void SetTransportShip(GameObject prefab, Material mat)
+    {
+        _transportPrefab = prefab;
+        _transportMat = mat;
+    }
+
+    // Грузовой корабль: корпус + контейнеры по бокам + навигационные огни (красный слева, зелёный справа).
+    public static GameObject BuildTransport(Transform parent)
+    {
+        GameObject model = new GameObject("Transport_Model");
+        model.transform.SetParent(parent, false);
+
+        Bounds b;
+        if (_transportPrefab != null)
+        {
+            b = PlaceShipModel(_transportPrefab, model.transform, _enemyEuler, 10f, _transportMat);
+        }
+        else
+        {
+            Material hullMat = Lit(new Color(0.55f, 0.57f, 0.6f), 0f, 0.6f, 0.5f);
+            Part(PrimitiveType.Cube, model.transform, Vector3.zero, new Vector3(2.2f, 1.6f, 10f), hullMat);
+            Part(PrimitiveType.Cube, model.transform, new Vector3(0f, 0.6f, 4.2f), new Vector3(1.6f, 1f, 1.6f), hullMat);
+            b = new Bounds(Vector3.zero, new Vector3(2.2f, 1.6f, 10f));
+        }
+
+        // грузовые контейнеры разных цветов
+        Color[] cargo = { new Color(0.85f, 0.35f, 0.15f), new Color(0.2f, 0.45f, 0.8f), new Color(0.75f, 0.7f, 0.2f), new Color(0.3f, 0.6f, 0.35f) };
+        float side = Mathf.Max(b.extents.x * 0.55f, 1.4f);
+        for (int i = 0; i < 3; i++)
+        {
+            float z = Mathf.Lerp(-b.extents.z * 0.55f, b.extents.z * 0.25f, i / 2f);
+            Material m = Lit(cargo[Random.Range(0, cargo.Length)], 0f, 0.2f, 0.35f);
+            Part(PrimitiveType.Cube, model.transform, new Vector3(-side, -0.4f, z), new Vector3(1.3f, 1.3f, 2.2f), m);
+            Part(PrimitiveType.Cube, model.transform, new Vector3(side, -0.4f, z), new Vector3(1.3f, 1.3f, 2.2f), m);
+        }
+
+        GlowBall(model.transform, new Vector3(-b.extents.x - 0.3f, 0f, 0f), 1.4f, new Color(1f, 0.1f, 0.1f, 1f));   // левый — красный
+        GlowBall(model.transform, new Vector3(b.extents.x + 0.3f, 0f, 0f), 1.4f, new Color(0.1f, 1f, 0.2f, 1f));    // правый — зелёный
+        GlowBall(model.transform, new Vector3(0f, 0f, -b.extents.z - 0.4f), 2.6f, new Color(1f, 0.75f, 0.35f, 1f)); // двигатель
+        GameObject beacon = GlowBall(model.transform, new Vector3(0f, b.extents.y + 0.4f, 0f), 1.6f, Color.white);
+        beacon.AddComponent<Blink3D>();
+        return model;
+    }
+
     public static GameObject BuildBoss(Transform parent)
     {
         if (HasImportedEnemies)
@@ -797,5 +845,17 @@ public class FadeLight3D : MonoBehaviour
     void Update()
     {
         _light.intensity = Mathf.MoveTowards(_light.intensity, 0f, _start * Time.deltaTime * 2.2f);
+    }
+}
+
+// Мигающий огонёк (маяк транспортника).
+public class Blink3D : MonoBehaviour
+{
+    private float _phase;
+    void Start() { _phase = Random.Range(0f, 1f); }
+    void Update()
+    {
+        bool on = Mathf.Repeat(Time.time * 1.3f + _phase, 1f) < 0.12f;
+        transform.localScale = Vector3.one * (on ? 1.6f : 0.01f);
     }
 }
