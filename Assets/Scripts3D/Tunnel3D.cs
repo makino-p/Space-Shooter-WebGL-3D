@@ -139,6 +139,34 @@ public class Tunnel3D : MonoBehaviour
         return p;
     }
 
+    // ---------------- Непроницаемый луч ----------------
+    public float BeamBarrierRadius = 4f; // "твёрдая" толщина луча (примерно ширина свечения)
+
+    // Не даёт кораблю пройти сквозь луч: выталкивает на ту сторону, откуда он подлетел,
+    // и ловит быстрый пролёт насквозь за один кадр (проверяется весь отрезок движения).
+    public Vector3 PushOutOfBeam(Vector3 pos, Vector3 prevPos, float shipRadius, out bool blocked)
+    {
+        float minR = BeamBarrierRadius + shipRadius;
+        Vector2 a = new Vector2(prevPos.x, prevPos.y);
+        Vector2 b = new Vector2(pos.x, pos.y);
+        blocked = false;
+
+        // ближайшая к лучу точка отрезка движения (в плоскости XY)
+        Vector2 ab = b - a;
+        float t = ab.sqrMagnitude > 1e-6f ? Mathf.Clamp01(-Vector2.Dot(a, ab) / ab.sqrMagnitude) : 1f;
+        Vector2 closest = a + ab * t;
+        if (closest.magnitude >= minR) return pos;
+
+        blocked = true;
+        // сторона, с которой корабль подлетел
+        Vector2 side = a.sqrMagnitude > 1e-4f ? a.normalized : (b.sqrMagnitude > 1e-4f ? b.normalized : Vector2.down);
+        // оставляем скольжение вдоль луча и по окружности, убираем только движение "внутрь"
+        Vector2 tangential = b - side * Vector2.Dot(b, side);
+        Vector2 pushed = side * minR + tangential;
+        if (pushed.magnitude < minR) pushed = pushed.normalized * minR;
+        return new Vector3(pushed.x, pushed.y, pos.z);
+    }
+
     public bool IsInsideTunnel(Vector3 p, float margin)
     {
         return new Vector2(p.x, p.y).magnitude < Radius + margin;

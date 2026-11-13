@@ -33,7 +33,7 @@ public class Player3D : Hittable3D
     public float ThrusterOverheatCooldown = 2f;
 
     [Header("Weapons")]
-    public int MaxAmmo = 15;
+    public int MaxAmmo = 150; // в 10 раз больше, чем было
     public float FireRate = 0.18f;
     public float ShotSpeed = 130f;
     public Color BulletColor = new Color(1f, 0.12f, 0.08f); // красные пули-капсулы
@@ -74,8 +74,7 @@ public class Player3D : Hittable3D
     private float _speedMultiplier = 1f;
     private bool _speedBoost, _negative;
 
-    private GameObject _shieldBubble;
-    private Renderer _shieldRenderer;
+    private HullTint3D _hullTint;
     private readonly List<ParticleSystem> _damageSmoke = new List<ParticleSystem>();
     private ParticleSystem[] _trails;
 
@@ -108,9 +107,9 @@ public class Player3D : Hittable3D
             _trails[i] = Factory3D.EngineTrail(_model, engines[i], new Color(1f, 0.6f, 0.25f, 0.9f), 0.6f);
         }
 
-        _shieldBubble = Factory3D.Part(PrimitiveType.Sphere, transform, Vector3.zero, Vector3.one * 7.5f, Factory3D.GlowFlat(new Color(0.15f, 0.4f, 0.55f, 0.25f)));
-        _shieldRenderer = _shieldBubble.GetComponent<Renderer>();
-        _shieldBubble.SetActive(false);
+        // щит — светящаяся окраска самого корпуса (вместо сферы вокруг корабля)
+        _hullTint = _model.gameObject.AddComponent<HullTint3D>();
+        _hullTint.Init();
     }
 
     void Start()
@@ -281,6 +280,17 @@ public class Player3D : Hittable3D
         if (Tunnel3D.Instance != null)
         {
             pos = Tunnel3D.Instance.ClampToArena(pos, out clamped);
+
+            // луч непроницаем: корабль упирается в него и скользит вдоль, искрясь
+            bool hitBeam;
+            pos = Tunnel3D.Instance.PushOutOfBeam(pos, transform.position, Radius, out hitBeam);
+            if (hitBeam && Time.time >= _nextBeamSpark)
+            {
+                _nextBeamSpark = Time.time + 0.12f;
+                Vector3 toBeam = new Vector3(-pos.x, -pos.y, 0f).normalized;
+                Effects3D.ImpactSparks(pos + toBeam * Radius, -toBeam, new Color(0.4f, 0.85f, 1f));
+                if (Game3D.Instance != null) Game3D.Instance.CameraRig.Shake(0.08f, 0.08f);
+            }
         }
         else
         {
@@ -289,10 +299,12 @@ public class Player3D : Hittable3D
         }
         if (clamped && Game3D.Instance != null)
         {
-            Game3D.Instance.UI.ShowMessage("RETURN TO THE TUNNEL", 0.6f, new Color(1f, 0.8f, 0.3f));
+            Game3D.Instance.UI.ShowMessage("RETURN TO THE BEAM", 0.6f, new Color(1f, 0.8f, 0.3f));
         }
         transform.position = pos;
     }
+
+    private float _nextBeamSpark;
 
     void HandleShooting()
     {
@@ -373,11 +385,6 @@ public class Player3D : Hittable3D
         _roll = Mathf.Lerp(_roll, targetRoll, Time.deltaTime * 5f);
         _model.localRotation = Quaternion.Euler(0f, 0f, _roll);
 
-        if (_shieldBubble.activeSelf)
-        {
-            float pulse = 7.5f + Mathf.Sin(Time.time * 5f) * 0.15f;
-            _shieldBubble.transform.localScale = Vector3.one * pulse;
-        }
 
         foreach (ParticleSystem ps in _trails)
         {
@@ -409,6 +416,7 @@ public class Player3D : Hittable3D
         {
             Shield--;
             UpdateShieldVisual();
+            if (_hullTint != null) _hullTint.Flash(); // вспышка корпуса при попадании в щит
             if (Game3D.Instance != null) Game3D.Instance.CameraRig.Shake(0.15f, 0.15f);
             return;
         }
@@ -444,7 +452,6 @@ public class Player3D : Hittable3D
             Game3D.Instance.OnPlayerDeath();
         }
         _model.gameObject.SetActive(false);
-        _shieldBubble.SetActive(false);
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
     }
@@ -462,13 +469,10 @@ public class Player3D : Hittable3D
         RefreshUI();
     }
 
+    // Сила щита видна по цвету корпуса: голубой (3) → жёлтый (2) → красный (1) → без подсветки.
     void UpdateShieldVisual()
     {
-        _shieldBubble.SetActive(Shield > 0);
-        Color c = Shield >= 3 ? new Color(0.3f, 0.8f, 1f, 0.35f)
-                : Shield == 2 ? new Color(1f, 0.85f, 0.2f, 0.35f)
-                : new Color(1f, 0.2f, 0.2f, 0.4f);
-        _shieldRenderer.sharedMaterial = Factory3D.GlowFlat(c * 0.5f);
+        if (_hullTint != null) _hullTint.SetShield(Shield);
         if (Game3D.Instance != null) Game3D.Instance.UI.UpdateShield(Shield, MaxShield);
     }
 
@@ -516,7 +520,7 @@ public class Player3D : Hittable3D
                 if (ui != null) ui.ShowMessage("HOMING MISSILES", 1.2f, Factory3D.PickupColor(type));
                 break;
             case PickupType.Negative:
-                Ammo = Mathf.Max(0, Ammo - 3);
+                Ammo = Mathf.Max(0, Ammo - 30);
                 if (ui != null) { ui.UpdateAmmo(Ammo, MaxAmmo); ui.ShowMessage("ENGINE MALFUNCTION", 1.5f, Factory3D.PickupColor(type)); }
                 if (!_negative) StartCoroutine(SpeedRoutine(0.5f, 4f, true));
                 if (Game3D.Instance != null) Game3D.Instance.CameraRig.Shake(0.4f, 0.25f);

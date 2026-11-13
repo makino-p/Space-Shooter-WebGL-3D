@@ -26,7 +26,7 @@ public class Enemy3D : Hittable3D
     private Vector3 _velocity;
     private float _speed = 28f;
     private float _spawnTime;
-    private GameObject _shieldBubble;
+    private HullTint3D _hullTint;
     private Transform _model;
 
     // наездник спирали
@@ -91,8 +91,10 @@ public class Enemy3D : Hittable3D
 
         if (HasShield)
         {
-            _shieldBubble = Factory3D.Part(PrimitiveType.Sphere, transform, Vector3.zero, Vector3.one * 7f,
-                                           Factory3D.GlowFlat(new Color(0.15f, 0.45f, 0.6f, 0.3f)));
+            // щит врага — голубая светящаяся окраска корпуса
+            _hullTint = _model.gameObject.AddComponent<HullTint3D>();
+            _hullTint.Init();
+            _hullTint.SetShield(3);
         }
 
         Vector3 p = transform.position;
@@ -156,10 +158,6 @@ public class Enemy3D : Hittable3D
             }
         }
 
-        if (_shieldBubble != null)
-        {
-            _shieldBubble.transform.localScale = Vector3.one * (7f + Mathf.Sin(Time.time * 4f) * 0.25f);
-        }
 
         float relZ = transform.position.z - PlayerPos().z;
         if (relZ > 1200f || relZ < -700f || new Vector2(transform.position.x, transform.position.y).magnitude > 600f)
@@ -361,7 +359,7 @@ public class Enemy3D : Hittable3D
         if (HasShield)
         {
             HasShield = false;
-            if (_shieldBubble != null) Destroy(_shieldBubble);
+            if (_hullTint != null) { _hullTint.SetShield(0); _hullTint.Flash(); }
             Factory3D.ShieldHit(transform.position, new Color(0.3f, 0.8f, 1f));
             return true;
         }
