@@ -108,8 +108,79 @@ public static class Factory3D
         return g;
     }
 
+    // ---------------- Модели из 2D-спрайтов ----------------
+    private static Mesh _playerMesh, _enemyMesh, _asteroidMesh;
+    private static Material _playerMat, _enemyMat, _asteroidMat;
+
+    // Масштабы: меш построен в юнитах спрайта (512px / 100 ppu).
+    private const float PlayerModelScale = 1.4f;
+    private const float EnemyModelScale = 1.7f;
+    private const float AsteroidSpriteDiameter = 2.25f; // видимая ширина камня на спрайте
+
+    public static bool HasSpriteModels { get { return _playerMesh != null && _playerMat != null; } }
+
+    public static void SetSpriteModels(Mesh player, Material playerMat, Mesh enemy, Material enemyMat, Mesh asteroid, Material asteroidMat)
+    {
+        _playerMesh = player; _playerMat = playerMat;
+        _enemyMesh = enemy; _enemyMat = enemyMat;
+        _asteroidMesh = asteroid; _asteroidMat = asteroidMat;
+    }
+
+    public static Vector3[] PlayerEnginePoints
+    {
+        get
+        {
+            return HasSpriteModels
+                ? new[] { new Vector3(-0.28f, 0f, -2.35f), new Vector3(0.28f, 0f, -2.35f) }
+                : new[] { new Vector3(-0.55f, -0.1f, -1.8f), new Vector3(0.55f, -0.1f, -1.8f) };
+        }
+    }
+
+    static GameObject MeshPart(Mesh mesh, Material material, Transform parent, Vector3 localPos, float scale, Vector3 euler)
+    {
+        GameObject g = new GameObject(mesh.name);
+        g.transform.SetParent(parent, false);
+        g.transform.localPosition = localPos;
+        g.transform.localRotation = Quaternion.Euler(euler);
+        g.transform.localScale = Vector3.one * scale;
+        g.AddComponent<MeshFilter>().sharedMesh = mesh;
+        g.AddComponent<MeshRenderer>().sharedMaterial = material;
+        return g;
+    }
+
+    // Копия материала спрайта с оттенком (кэшируется).
+    static Material Tinted(Material source, Color tint, float emission)
+    {
+        string key = "T" + source.GetInstanceID() + tint + emission;
+        Material m;
+        if (_cache.TryGetValue(key, out m)) return m;
+        m = new Material(source);
+        m.color = tint;
+        m.EnableKeyword("_EMISSION");
+        m.SetColor("_EmissionColor", tint * emission);
+        _cache[key] = m;
+        return m;
+    }
+
     // ---------------- Корабль игрока ----------------
     public static GameObject BuildPlayerShip(Transform parent)
+    {
+        if (HasSpriteModels)
+        {
+            GameObject model = new GameObject("Ship_Model");
+            model.transform.SetParent(parent, false);
+            // спрайт: нос вверх = +Z в 3D, картинка смотрит вверх
+            MeshPart(_playerMesh, _playerMat, model.transform, Vector3.zero, PlayerModelScale, Vector3.zero);
+            foreach (Vector3 e in PlayerEnginePoints)
+            {
+                GlowBall(model.transform, e + new Vector3(0, 0, -0.2f), 1.3f, new Color(1f, 0.6f, 0.2f, 1f));
+            }
+            return model;
+        }
+        return BuildPrimitivePlayerShip(parent);
+    }
+
+    static GameObject BuildPrimitivePlayerShip(Transform parent)
     {
         GameObject root = new GameObject("Ship_Model");
         root.transform.SetParent(parent, false);
@@ -156,6 +227,40 @@ public static class Factory3D
     }
 
     public static GameObject BuildEnemyShip(Transform parent, Enemy3DType type)
+    {
+        if (_enemyMesh != null && _enemyMat != null)
+        {
+            GameObject model = new GameObject("Enemy_Model");
+            model.transform.SetParent(parent, false);
+            Color c = EnemyColor(type);
+            // каждый тип врага слегка окрашен в свой цвет, исходная картинка сохраняется
+            Color tint = type == Enemy3DType.Basic ? Color.white : Color.Lerp(Color.white, c, 0.55f);
+            // в 2D враг летел вниз, поэтому нос спрайта смотрит вниз — разворачиваем на 180°
+            MeshPart(_enemyMesh, Tinted(_enemyMat, tint, 0.08f), model.transform, Vector3.zero, EnemyModelScale, new Vector3(0, 180, 0));
+
+            GlowBall(model.transform, new Vector3(0f, 0.35f, 1.2f), 1.3f, c);                 // "глаз" спереди
+            GlowBall(model.transform, new Vector3(-0.6f, 0f, -2.2f), 0.9f, new Color(1f, 0.3f, 0.2f, 1f)); // двигатели
+            GlowBall(model.transform, new Vector3(0.6f, 0f, -2.2f), 0.9f, new Color(1f, 0.3f, 0.2f, 1f));
+
+            switch (type)
+            {
+                case Enemy3DType.RearGunner:
+                    GlowBall(model.transform, new Vector3(0f, 0.3f, -2.6f), 1.2f, c); // хвостовая пушка
+                    break;
+                case Enemy3DType.Beamer:
+                    GlowBall(model.transform, new Vector3(0f, 0f, 2.4f), 1.6f, c);    // излучатель луча
+                    break;
+                case Enemy3DType.Dodger:
+                    GlowBall(model.transform, new Vector3(-1.9f, 0f, 0.4f), 0.8f, c);
+                    GlowBall(model.transform, new Vector3(1.9f, 0f, 0.4f), 0.8f, c);
+                    break;
+            }
+            return model;
+        }
+        return BuildPrimitiveEnemyShip(parent, type);
+    }
+
+    static GameObject BuildPrimitiveEnemyShip(Transform parent, Enemy3DType type)
     {
         GameObject root = new GameObject("Enemy_Model");
         root.transform.SetParent(parent, false);
@@ -204,6 +309,26 @@ public static class Factory3D
 
     // ---------------- Босс ----------------
     public static GameObject BuildBoss(Transform parent)
+    {
+        if (_enemyMesh != null && _enemyMat != null)
+        {
+            // босс — огромный вражеский корабль из того же спрайта, в красных тонах
+            GameObject model = new GameObject("Boss_Model");
+            model.transform.SetParent(parent, false);
+            MeshPart(_enemyMesh, Tinted(_enemyMat, new Color(1f, 0.55f, 0.5f), 0.12f), model.transform,
+                     Vector3.zero, EnemyModelScale * 4.5f, new Vector3(0, 180, 0));
+            GlowBall(model.transform, new Vector3(0f, 1.2f, 5.5f), 7f, new Color(1f, 0.3f, 0.1f, 1f)); // ядро
+            for (int i = -1; i <= 1; i += 2)
+            {
+                GlowBall(model.transform, new Vector3(2.8f * i, 0f, -8.5f), 4f, new Color(1f, 0.35f, 0.15f, 1f)); // двигатели
+                GlowBall(model.transform, new Vector3(6.5f * i, 0.8f, 2f), 2.5f, new Color(1f, 0.5f, 0.1f, 1f));  // орудия
+            }
+            return model;
+        }
+        return BuildPrimitiveBoss(parent);
+    }
+
+    static GameObject BuildPrimitiveBoss(Transform parent)
     {
         GameObject root = new GameObject("Boss_Model");
         root.transform.SetParent(parent, false);
@@ -293,6 +418,21 @@ public static class Factory3D
 
     // ---------------- Астероид ----------------
     public static GameObject BuildAsteroid(Transform parent, float size)
+    {
+        if (_asteroidMesh != null && _asteroidMat != null)
+        {
+            GameObject model = new GameObject("Asteroid_Model");
+            model.transform.SetParent(parent, false);
+            // немного разные пропорции, чтобы астероиды не были одинаковыми
+            GameObject rock = MeshPart(_asteroidMesh, _asteroidMat, model.transform, Vector3.zero, size / AsteroidSpriteDiameter, Vector3.zero);
+            rock.transform.localScale = Vector3.Scale(rock.transform.localScale,
+                new Vector3(Random.Range(0.85f, 1.15f), Random.Range(0.85f, 1.2f), Random.Range(0.85f, 1.15f)));
+            return model;
+        }
+        return BuildPrimitiveAsteroid(parent, size);
+    }
+
+    static GameObject BuildPrimitiveAsteroid(Transform parent, float size)
     {
         GameObject root = new GameObject("Asteroid_Model");
         root.transform.SetParent(parent, false);

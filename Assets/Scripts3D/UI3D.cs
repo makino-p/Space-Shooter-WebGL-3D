@@ -205,8 +205,8 @@ public class UI3D : MonoBehaviour
     public void ShowGameOver(bool win)
     {
         _gameOver.gameObject.SetActive(true);
-        _gameOver.text = win ? "YOU WIN!\n<size=24>R - play again    M - main menu</size>"
-                             : "GAME OVER\n<size=24>R - restart    M - main menu</size>";
+        _gameOver.text = win ? "YOU WIN!\n<size=24>R - play again</size>"
+                             : "GAME OVER\n<size=24>R - restart</size>";
         _gameOver.supportRichText = true;
         _gameOver.color = win ? new Color(0.4f, 1f, 0.5f) : new Color(1f, 0.3f, 0.3f);
         if (!win) StartCoroutine(FlickerGameOver());

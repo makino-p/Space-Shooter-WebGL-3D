@@ -69,7 +69,16 @@ public class Player3D : Hittable3D
     private readonly List<ParticleSystem> _damageSmoke = new List<ParticleSystem>();
     private ParticleSystem[] _trails;
 
-    private static readonly Vector3[] GunPoints = { new Vector3(-1.9f, -0.12f, 1.0f), new Vector3(1.9f, -0.12f, 1.0f) };
+    // носы двух передних пушек корабля (совпадают со спрайтом 2D-версии)
+    private static Vector3[] GunPoints
+    {
+        get
+        {
+            return Factory3D.HasSpriteModels
+                ? new[] { new Vector3(-0.72f, 0.1f, 2.9f), new Vector3(0.72f, 0.1f, 2.9f) }
+                : new[] { new Vector3(-1.9f, -0.12f, 1.0f), new Vector3(1.9f, -0.12f, 1.0f) };
+        }
+    }
     private int _gunIndex;
 
     void Awake()
@@ -83,13 +92,14 @@ public class Player3D : Hittable3D
         _speed = CruiseSpeed;
 
         _model = Factory3D.BuildPlayerShip(transform).transform;
-        _trails = new[]
+        Vector3[] engines = Factory3D.PlayerEnginePoints;
+        _trails = new ParticleSystem[engines.Length];
+        for (int i = 0; i < engines.Length; i++)
         {
-            Factory3D.EngineTrail(_model, new Vector3(-0.55f, -0.1f, -1.8f), new Color(0.4f, 0.75f, 1f, 0.9f), 0.6f),
-            Factory3D.EngineTrail(_model, new Vector3(0.55f, -0.1f, -1.8f), new Color(0.4f, 0.75f, 1f, 0.9f), 0.6f)
-        };
+            _trails[i] = Factory3D.EngineTrail(_model, engines[i], new Color(1f, 0.6f, 0.25f, 0.9f), 0.6f);
+        }
 
-        _shieldBubble = Factory3D.Part(PrimitiveType.Sphere, transform, Vector3.zero, Vector3.one * 6f, Factory3D.GlowFlat(new Color(0.15f, 0.4f, 0.55f, 0.25f)));
+        _shieldBubble = Factory3D.Part(PrimitiveType.Sphere, transform, Vector3.zero, Vector3.one * 7.5f, Factory3D.GlowFlat(new Color(0.15f, 0.4f, 0.55f, 0.25f)));
         _shieldRenderer = _shieldBubble.GetComponent<Renderer>();
         _shieldBubble.SetActive(false);
     }
@@ -284,7 +294,7 @@ public class Player3D : Hittable3D
 
         if (_shieldBubble.activeSelf)
         {
-            float pulse = 6f + Mathf.Sin(Time.time * 5f) * 0.15f;
+            float pulse = 7.5f + Mathf.Sin(Time.time * 5f) * 0.15f;
             _shieldBubble.transform.localScale = Vector3.one * pulse;
         }
 

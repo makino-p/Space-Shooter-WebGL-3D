@@ -17,6 +17,14 @@ public class Game3D : MonoBehaviour
     public Material LitMaterial;
     public Material GlowMaterial;
 
+    [Header("Models from 2D sprites (генерируются скриптом Setup3DScene)")]
+    public Mesh PlayerShipMesh;
+    public Mesh EnemyShipMesh;
+    public Mesh AsteroidMesh;
+    public Material PlayerShipMaterial;
+    public Material EnemyShipMaterial;
+    public Material AsteroidMaterial;
+
     [Header("Waves")]
     public int TotalWaves = 5;          // последняя волна заканчивается боссом
     public int BaseEnemiesPerWave = 4;
@@ -53,6 +61,7 @@ public class Game3D : MonoBehaviour
         Instance = this;
         Factory3D.LitBase = LitMaterial;
         Factory3D.GlowBase = GlowMaterial;
+        Factory3D.SetSpriteModels(PlayerShipMesh, PlayerShipMaterial, EnemyShipMesh, EnemyShipMaterial, AsteroidMesh, AsteroidMaterial);
         Hittable3D.All.Clear();
         Projectile3D.Active.Clear();
         Pickup3D.Pickups.Clear();
@@ -207,10 +216,6 @@ public class Game3D : MonoBehaviour
             if (Input.GetKeyDown(KeyCode.R))
             {
                 SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
-            }
-            else if (Input.GetKeyDown(KeyCode.M))
-            {
-                SceneManager.LoadScene(0);
             }
         }
     }
