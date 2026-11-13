@@ -19,7 +19,7 @@ public class Projectile3D : MonoBehaviour
     private const float HomingTurnRate = 200f;
 
     public static Projectile3D Spawn(Faction3D faction, Vector3 position, Vector3 direction, float speed, Color color,
-                                     float lifetime = 2.5f, float size = 1f, bool homing = false)
+                                     float lifetime = 2.5f, float size = 1f, bool homing = false, bool muzzleFlash = true)
     {
         GameObject go = new GameObject(faction == Faction3D.Player ? "Player_Shot" : "Enemy_Shot");
         go.transform.position = position;
@@ -46,7 +46,7 @@ public class Projectile3D : MonoBehaviour
         trail.colorGradient = g;
 
         // вспышка у дула (свет — только у игрока, чтобы не перегружать сцену)
-        Effects3D.MuzzleFlash(position, direction.normalized, color, faction == Faction3D.Player);
+        if (muzzleFlash) Effects3D.MuzzleFlash(position, direction.normalized, color, faction == Faction3D.Player);
 
         Projectile3D p = go.AddComponent<Projectile3D>();
         p._color = color;

@@ -196,8 +196,8 @@ public class Player3D : Hittable3D
     // Скорость растёт линейно, поэтому за SpinFullTurnTime секунд набегает ровно 360°.
     // После отпускания вращение плавно затухает, без рывка.
     [Header("Spin (правая кнопка мыши)")]
-    public float SpinFullTurnTime = 5f;   // полный оборот за 5 секунд удержания
-    public float SpinStopRate = 260f;     // как быстро гаснет вращение после отпускания (град/с²)
+    public float SpinFullTurnTime = 2f;   // полный оборот за 2 секунды удержания (было 5)
+    public float SpinStopRate = 600f;     // как быстро гаснет вращение после отпускания (град/с²)
     private float _spinHeld;
     private float _spinRate;              // текущая скорость вращения, град/с
     private float _spinRoll;              // накопленный угол вращения модели вокруг продольной оси
@@ -225,7 +225,7 @@ public class Player3D : Hittable3D
         else if (_spinRoll > 0.01f)
         {
             // после остановки плавно доворачивается в ровное положение кратчайшим путём
-            _spinRoll = Mathf.Repeat(Mathf.MoveTowardsAngle(_spinRoll, 0f, 120f * Time.deltaTime), 360f);
+            _spinRoll = Mathf.Repeat(Mathf.MoveTowardsAngle(_spinRoll, 0f, 300f * Time.deltaTime), 360f);
         }
     }
 
@@ -338,7 +338,7 @@ public class Player3D : Hittable3D
                                        Random.Range(-MachineGunSpread, MachineGunSpread), 0f) * AimDirection(gun);
 
         // "тяжёлые" режимы стреляют реже, иначе экран зальёт снарядами
-        if (_radial) _canFire = Time.time + 0.3f;
+        if (_radial) _canFire = Time.time + NovaInterval;
         else if (_homing) _canFire = Time.time + 0.14f;
 
         // отдача: мелкая дрожь камеры на каждый выстрел
@@ -354,16 +354,8 @@ public class Player3D : Hittable3D
         }
         else if (_radial)
         {
-            const int count = 30;
-            float golden = Mathf.PI * (3f - Mathf.Sqrt(5f));
-            for (int i = 0; i < count; i++)
-            {
-                float y = 1f - (i / (count - 1f)) * 2f;
-                float r = Mathf.Sqrt(1f - y * y);
-                float th = golden * i;
-                Vector3 dir = transform.TransformDirection(new Vector3(Mathf.Cos(th) * r, y, Mathf.Sin(th) * r));
-                Projectile3D.Spawn(Faction3D.Player, transform.position + dir * 2.5f, dir, 90f, CurrentBulletColor, 1.6f, BulletSize).WithPerks(BulletDamage, BulletPierce, BulletSplash);
-            }
+            // Nova: заряд → вспышка и ударная волна → два кольца снарядов (см. NovaBurstRoutine)
+            StartCoroutine(NovaBurstRoutine(CurrentBulletColor));
         }
         else if (_triple)
         {
@@ -382,6 +374,61 @@ public class Player3D : Hittable3D
         {
             Game3D.PlaySound(Game3D.Instance.LaserClip, 0.3f, Random.Range(1.05f, 1.3f)); // короткий частый "стрекот"
             Game3D.Instance.UI.UpdateAmmo(Ammo, MaxAmmo);
+        }
+    }
+
+    // ---------- Nova: выстрел во все стороны ----------
+    [Header("Nova (мульти-выстрел)")]
+    public float NovaInterval = 0.9f;     // пауза между залпами (было 0.3)
+    public int NovaBulletsPerRing = 22;
+    public float NovaChargeTime = 0.18f;
+
+    IEnumerator NovaBurstRoutine(Color color)
+    {
+        // 1. заряд: на корабле разгорается сгусток энергии
+        GameObject charge = Factory3D.GlowBall(transform, Vector3.zero, 0.2f, new Color(color.r, color.g, color.b, 1f));
+        GameObject core = Factory3D.GlowBall(transform, Vector3.zero, 0.1f, Color.white);
+        float t = 0f;
+        while (t < NovaChargeTime)
+        {
+            t += Time.deltaTime;
+            float k = Mathf.Clamp01(t / NovaChargeTime);
+            charge.transform.localScale = Vector3.one * Mathf.Lerp(0.5f, 9f, k * k);
+            core.transform.localScale = Vector3.one * Mathf.Lerp(0.3f, 4f, k);
+            yield return null;
+        }
+        Destroy(charge);
+        Destroy(core);
+        if (!_alive) yield break;
+
+        // 2. разряд: вспышка, ударная волна в плоскости корабля, искры, свет, толчок камеры
+        Effects3D.NovaRelease(transform.position, transform.rotation, color);
+        if (Game3D.Instance != null)
+        {
+            Game3D.Instance.CameraRig.Shake(0.25f, 0.35f);
+            Game3D.PlaySound(Game3D.Instance.LaserClip, 0.9f, 0.55f);
+            Game3D.PlaySound(Game3D.Instance.ExplosionClip, 0.35f, 1.6f);
+        }
+
+        // 3. два кольца снарядов: второе чуть позже и повёрнуто — плотная "сфера" без пустот
+        SpawnNovaRing(color, 0f, 120f);
+        yield return new WaitForSeconds(0.07f);
+        if (!_alive) yield break;
+        SpawnNovaRing(color, 0.5f, 105f);
+    }
+
+    void SpawnNovaRing(Color color, float phase, float speed)
+    {
+        int count = Mathf.Max(6, NovaBulletsPerRing);
+        float golden = Mathf.PI * (3f - Mathf.Sqrt(5f));
+        for (int i = 0; i < count; i++)
+        {
+            float y = 1f - (i / (count - 1f)) * 2f;
+            float r = Mathf.Sqrt(1f - y * y);
+            float th = golden * i + phase;
+            Vector3 dir = transform.TransformDirection(new Vector3(Mathf.Cos(th) * r, y, Mathf.Sin(th) * r));
+            Projectile3D.Spawn(Faction3D.Player, transform.position + dir * 3f, dir, speed, color, 1.8f, BulletSize, false, false)
+                        .WithPerks(BulletDamage, BulletPierce, BulletSplash);
         }
     }
 

@@ -321,6 +321,54 @@ public static class Effects3D
         Burst(ps, count);
     }
 
+    // Разряд Nova: ослепительная вспышка, плоская ударная волна в плоскости корабля,
+    // сферическая волна, сноп искр во все стороны и вспышка света.
+    public static void NovaRelease(Vector3 position, Quaternion shipRotation, Color color)
+    {
+        GameObject root = new GameObject("Nova_Release");
+        root.transform.position = position;
+
+        Flash(root.transform, Color.Lerp(color, Color.white, 0.6f), 22f, 0.06f, 0.35f);
+        Shockwave(root.transform, Color.Lerp(color, Color.white, 0.3f), 40f, 0.5f);
+
+        // плоское кольцо, расходящееся в плоскости корабля
+        GameObject ring = new GameObject("Nova_Ring");
+        ring.transform.SetParent(root.transform, false);
+        ring.transform.rotation = shipRotation * Quaternion.Euler(90f, 0f, 0f);
+        ExpandingRing3D er = ring.AddComponent<ExpandingRing3D>();
+        er.Color = color;
+        er.MaxRadius = 55f;
+        er.Duration = 0.55f;
+
+        // сноп искр во все стороны
+        ParticleSystem sparks = NewSystem("Nova_Sparks", root.transform, SparkMat);
+        {
+            var main = sparks.main;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.25f, 0.6f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(40f, 90f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.15f, 0.35f);
+            var shape = sparks.shape; shape.shapeType = ParticleSystemShapeType.Sphere; shape.radius = 1f;
+            var col = sparks.colorOverLifetime; col.enabled = true;
+            col.color = Grad(new[] { Color.white, color }, new[] { 0f, 1f }, new[] { 1f, 0f }, new[] { 0f, 1f });
+            ParticleSystemRenderer r = sparks.GetComponent<ParticleSystemRenderer>();
+            r.renderMode = ParticleSystemRenderMode.Stretch;
+            r.velocityScale = 0.04f;
+            r.lengthScale = 1.5f;
+            Burst(sparks, 70);
+        }
+
+        GameObject lightGo = new GameObject("Nova_Light");
+        lightGo.transform.SetParent(root.transform, false);
+        Light l = lightGo.AddComponent<Light>();
+        l.type = LightType.Point;
+        l.color = color;
+        l.range = 60f;
+        l.intensity = 5f;
+        lightGo.AddComponent<FadeLight3D>();
+
+        Object.Destroy(root, 1.5f);
+    }
+
     // ---------------- Общие кирпичики ----------------
     static void Flash(Transform root, Color color, float maxSize, float growTime, float lifetime)
     {
@@ -408,5 +456,49 @@ public class Debris3D : MonoBehaviour
         float k = Mathf.Clamp01(_t / Lifetime);
         transform.localScale = _scale * (1f - k * k);
         if (_t >= Lifetime) Destroy(gameObject);
+    }
+}
+
+// Плоское неоновое кольцо, быстро расходящееся и гаснущее (ударная волна Nova).
+public class ExpandingRing3D : MonoBehaviour
+{
+    public Color Color = Color.white;
+    public float MaxRadius = 50f;
+    public float Duration = 0.5f;
+
+    private LineRenderer _lr;
+    private float _t;
+    private const int Points = 72;
+
+    void Start()
+    {
+        _lr = gameObject.AddComponent<LineRenderer>();
+        _lr.useWorldSpace = false;
+        _lr.loop = true;
+        _lr.positionCount = Points;
+        _lr.sharedMaterial = Factory3D.GlowFlat(Color.white);
+        _lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        _lr.receiveShadows = false;
+    }
+
+    void Update()
+    {
+        _t += Time.deltaTime;
+        float k = Mathf.Clamp01(_t / Duration);
+        float eased = 1f - (1f - k) * (1f - k) * (1f - k);
+        float radius = Mathf.Lerp(1f, MaxRadius, eased);
+        for (int i = 0; i < Points; i++)
+        {
+            float a = i * Mathf.PI * 2f / Points;
+            _lr.SetPosition(i, new Vector3(Mathf.Cos(a) * radius, Mathf.Sin(a) * radius, 0f));
+        }
+        float width = Mathf.Lerp(2.5f, 0.3f, k);
+        _lr.startWidth = width;
+        _lr.endWidth = width;
+        Color c = Color.Lerp(Color.white, Color, k * 0.7f);
+        c.a = 1f - k;
+        _lr.startColor = c;
+        _lr.endColor = c;
+        if (_t >= Duration) Destroy(gameObject);
     }
 }
